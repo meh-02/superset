@@ -157,7 +157,7 @@
     "ag-grid-community": "35.0.1",
     "ag-grid-react": "35.0.1",
     "antd": "^5.26.0",
-    "chrono-node": "^2.9.0",
+    "chrono-node": "^2.9.1",
     "classnames": "^2.2.5",
     "content-disposition": "^1.0.1",
     "d3-color": "^3.1.0",
