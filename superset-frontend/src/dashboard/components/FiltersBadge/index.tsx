@@ -122,6 +122,15 @@ export const FiltersBadge = ({ chartId }: FiltersBadgeProps) => {
     state => state.dashboardInfo.metadata?.chart_configuration,
   );
   const chart = useSelector<RootState, Chart>(state => state.charts[chartId]);
+  const adhocFilters = chart?.latestQueryFormData?.adhoc_filters || [];
+  const visibleAdhocFilters = adhocFilters.filter(
+    (filter: any) => 
+      filter?.subject &&
+      filter?.comparator && 
+      ( 
+        Array.isArray(filter.comparator) ? filter.comparator.length > 0 : true 
+      ),
+  );
   const chartLayoutItems = useChartLayoutItems();
   const dataMask = useSelector<RootState, DataMaskStateWithId>(
     state => state.dataMask,
@@ -297,8 +306,10 @@ export const FiltersBadge = ({ chartId }: FiltersBadgeProps) => {
 
   return (
     <DetailsPanelPopover
+      chartId={chartId}
       appliedCrossFilterIndicators={appliedCrossFilterIndicators}
       appliedIndicators={appliedIndicators}
+      adhocFilters={visibleAdhocFilters}
       onHighlightFilterSource={onHighlightFilterSource}
       setPopoverVisible={setPopoverVisible}
       popoverVisible={popoverVisible}

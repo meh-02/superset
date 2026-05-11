@@ -33,8 +33,10 @@ import FilterIndicator from 'src/dashboard/components/FiltersBadge/FilterIndicat
 import { RootState } from 'src/dashboard/types';
 
 export interface DetailsPanelProps {
+  chartId: number;
   appliedCrossFilterIndicators: Indicator[];
   appliedIndicators: Indicator[];
+  adhocFilters: any[];
   onHighlightFilterSource: (path: string[]) => void;
   children: JSX.Element;
   popoverVisible: boolean;
@@ -44,8 +46,10 @@ export interface DetailsPanelProps {
 }
 
 const DetailsPanelPopover = ({
+  chartId,
   appliedCrossFilterIndicators = [],
   appliedIndicators = [],
+  adhocFilters = [],
   onHighlightFilterSource,
   children,
   popoverVisible,
@@ -56,6 +60,12 @@ const DetailsPanelPopover = ({
   const activeTabs = useSelector<RootState>(
     state => state.dashboardState?.activeTabs,
   );
+  const chart = useSelector(
+   (state: RootState) => state.charts[chartId],
+  );
+
+  //const adhocFilters = chart?.latestQueryFormData?.adhoc_filters || [];
+
   // Combined ref array for all filter indicator elements
   const indicatorRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -120,6 +130,7 @@ const DetailsPanelPopover = ({
 
   const indicatorKey = (indicator: Indicator): string =>
     `${indicator.column} - ${indicator.name}`;
+  //const totalAppliedFilters = appliedIndicators.length + adhocFilters.length;
   const theme = useTheme();
   const content = (
     <FiltersDetailsContainer

@@ -72,6 +72,7 @@ import {
 import getFormDataWithExtraFilters from '../../../util/charts/getFormDataWithExtraFilters';
 import { useChartCustomizationFromRedux } from '../../nativeFilters/state';
 import { PLACEHOLDER_DATASOURCE } from '../../../constants';
+import { Tag } from 'antd';
 
 interface ChartProps {
   id: number;
@@ -177,6 +178,9 @@ const Chart = (props: ChartProps) => {
   );
 
   const chart = useSelector((state: RootState) => state.charts[props.id]);
+  console.log('chart.form_data', chart?.form_data);
+console.log('latestQueryFormData', chart?.latestQueryFormData);
+//  console.log("-------appliedFilters : ------", appliedFilters);
   const queriesResponse = chart?.queriesResponse;
   const chartUpdateEndTime = chart?.chartUpdateEndTime;
   const chartStatus = chart?.chartStatus;
@@ -468,7 +472,7 @@ const Chart = (props: ChartProps) => {
   );
 
   (formData as JsonObject).dashboardId = dashboardInfo.id;
-
+  
   const exportTable = useCallback(
     (format: string, isFullCSV: boolean, isPivot = false) => {
       const logAction =

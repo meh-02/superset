@@ -345,7 +345,7 @@ const FilterBar: FC<FiltersBarProps> = ({
     }
   }, [dashboardId, filters, previousDashboardId, setDataMaskSelected]);
 
-  const dataMaskAppliedText = JSON.stringify(dataMaskApplied);
+const dataMaskAppliedText = JSON.stringify(dataMaskApplied);
   const prevDataMaskAppliedRef = useRef(dataMaskApplied);
 
   useEffect(() => {
@@ -593,6 +593,40 @@ const FilterBar: FC<FiltersBarProps> = ({
       !hasPendingChartCustomizations &&
       !hasClearedChartCustomizations) ||
     hasMissingRequiredChartCustomization;
+  
+  //const urlParams = new URLSearchParams(window.location.search);
+//  const filtersToHide = useMemo(() => {
+  // const urlParams = new URLSearchParams(window.location.search); 
+  // return (urlParams.get('hide_filters')?.split(',') || [].map(id=>id.replace(/[\\"']/g, '').trim());
+  //}, []);
+  
+  const filtersToHide = useMemo(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  console.log('raw search: ', window.location.search);
+console.log('hide_filters value:' , urlParams.get('hide_filters'));
+  //const raw = urlParams.get('hide_filters');
+
+  return (urlParams.get('hide_filters')?.split(',') || []).map(id => id.replace(/[\\"']/g, '').trim());
+}, []);
+  
+  const visibleFilterValues = filterValues.filter(filter=> {
+    const id = (filter as any).id;
+    const shouldHide = filtersToHide.includes(id);
+    console.log(`filter: ${id} | shouldHid: ${shouldHide}`);
+    return !shouldHide;
+  });    
+//!filtersToHide.includes((filter as any).id)); 
+//useMemo(() => { 
+    //console.log('all filter ids :', filterValues.map(f=>(f as any).id));
+    //console.log('filtersToHide: ', filtersToHide);
+    //console.log('match check : ', filterValues.map(f=>({
+      // id: (f as any).id,
+      // shouldHide: filtersToHide.includes((f as any).id),
+      // exactMatch: filtersToHide[0] === (f as any).id,
+     //  lengths: `hide:${filtersToHide[0]?.length} filter:${(f as any).id?.length}`
+   // })));
+  // filterValues.filter(filter=>!filtersToHide.includes(filter.id));
+ //}, [filterValues, filtersToHide]);  
 
   const isInitialized = useInitialization();
 
@@ -600,6 +634,7 @@ const FilterBar: FC<FiltersBarProps> = ({
     () => (
       <ActionButtons
         filterBarOrientation={orientation}
+        width={verticalConfig?.width}
         width={verticalConfig?.width}
         onApply={handleApply}
         onClearAll={handleClearAll}
@@ -630,7 +665,7 @@ const FilterBar: FC<FiltersBarProps> = ({
         canEdit={canEdit}
         dashboardId={dashboardId}
         dataMaskSelected={dataMaskSelected}
-        filterValues={filterValues}
+        filterValues={visibleFilterValues}
         chartCustomizationValues={chartCustomizationValues}
         isInitialized={isInitialized}
         onSelectionChange={handleFilterSelectionChange}
@@ -646,7 +681,7 @@ const FilterBar: FC<FiltersBarProps> = ({
         canEdit={canEdit}
         dataMaskSelected={dataMaskSelected}
         filtersOpen={verticalConfig.filtersOpen}
-        filterValues={filterValues}
+        filterValues={visibleFilterValues}
         chartCustomizationValues={chartCustomizationValues}
         isInitialized={isInitialized}
         height={verticalConfig.height}

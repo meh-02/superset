@@ -97,9 +97,18 @@ const DragDroppableStyles = styled.div`
       https://github.com/react-dnd/react-dnd/issues/832 */
     &.dragdroppable-column {
       /* for chrome */
-      transform: translate3d(0, 0, 0);
+//      transform: translate3d(0, 0, 0);
       /* for safari */
       backface-visibility: hidden;
+    }
+   
+    &.dragdroppable--edit-mode {
+      transform: translate3d(0,0,0);
+      overflow: hidden;
+    }
+    
+    &.dragdroppable--edit-mode:hover {
+      transform: translate3d(0,0,0);
     }
 
     &.dragdroppable-column .resizable-container span div {

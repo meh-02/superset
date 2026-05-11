@@ -24,7 +24,7 @@ import {
   useRef,
   RefObject,
 } from 'react';
-
+import { Modal, Select, Input, Popover } from 'antd';
 import { RouteComponentProps, useHistory } from 'react-router-dom';
 import { extendedDayjs } from '@superset-ui/core/utils/dates';
 import { t } from '@apache-superset/core/translation';
@@ -36,9 +36,11 @@ import {
   VizType,
   BinaryQueryObjectFilterClause,
   QueryFormData,
+  BinaryAdhocFilter,
+  SupersetClient
 } from '@superset-ui/core';
 import { css, useTheme, styled } from '@apache-superset/core/theme';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Menu, MenuItem } from '@superset-ui/core/components/Menu';
 import {
   NoAnimationDropdown,
@@ -61,6 +63,13 @@ import { useDatasetDrillInfo } from 'src/hooks/apiResources/datasets';
 import { ResourceStatus } from 'src/hooks/apiResources/apiResources';
 import { useCrossFiltersScopingModal } from '../nativeFilters/FilterBar/CrossFilters/ScopingModal/useCrossFiltersScopingModal';
 import { ViewResultsModalTrigger } from './ViewResultsModalTrigger';
+import AdhocFilter from 'src/explore/components/controls/FilterControl/AdhocFilter';
+import AdhocFilterPopoverTrigger from 'src/explore/components/controls/FilterControl/AdhocFilterPopoverTrigger';
+import { 
+  updateQueryFormData,
+  triggerQuery,
+  postChartFormData 
+} from 'src/components/Chart/chartAction';
 
 const RefreshTooltip = styled.div`
   ${({ theme }) => css`
@@ -156,13 +165,27 @@ const SliceHeaderControls = (
   const [drillModalIsOpen, setDrillModalIsOpen] = useState(false);
   // setting openKeys undefined falls back to uncontrolled behaviour
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
+  const [selectedValue, setSelectedValue] = useState<string | null>(null);
+  const [valueOptions, setValueOptions] = useState<string[]>([]);
+  const [loadingValues, setLoadingValues] = useState(false);
+//  const [operator, setOperator] = useState<string | null>(null);
+  const [operator, setOperator] = useState<
+  '==' | '!=' | '>' | '<' | '>=' | '<=' | 'IN' | 'NOT IN' | null
+>(null);
+  const [value, setValue] = useState<string | string[]>('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false); 
   const [openScopingModal, scopingModal] = useCrossFiltersScopingModal(
     props.slice.slice_id,
   );
   const history = useHistory();
+  const dispatch = useDispatch();
 
   const queryMenuRef: RefObject<any> = useRef(null);
   const resultsMenuRef: RefObject<any> = useRef(null);
+  const menuButtonRef = useRef<HTMLDivElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);  
 
   const [modalFilters, setFilters] = useState<BinaryQueryObjectFilterClause[]>(
     [],
@@ -185,18 +208,31 @@ const SliceHeaderControls = (
     props.formData,
     !canDrillToDetail,
   );
-
+  const chart = useSelector((state: RootState) => state.charts[props.slice.slice_id]);
+  console.log(
+  'Applied Filters:',
+  chart?.latestQueryFormData?.adhoc_filters
+);  
   const datasetWithVerboseMap =
     datasetResource.status === ResourceStatus.Complete
       ? datasetResource.result
       : undefined;
+
+  const columnOptions = Object.keys(
+  datasetWithVerboseMap?.verbose_map || {}
+).map(col => ({
+  label: datasetWithVerboseMap?.verbose_map?.[col] || col,
+  value: col,
+}));
+
+  console.log("column options :", columnOptions);
 
   const refreshChart = () => {
     if (props.updatedDttm) {
       props.forceRefresh(props.slice.slice_id, props.dashboardId);
     }
   };
-
+  
   const handleMenuClick = ({
     key,
     domEvent,
@@ -298,6 +334,10 @@ const SliceHeaderControls = (
         }
         break;
       }
+      case MenuKeys.ChartFilters: {
+	setIsFilterModalOpen(true);
+        break;
+      }
       default:
         break;
     }
@@ -381,6 +421,11 @@ const SliceHeaderControls = (
       key: MenuKeys.Fullscreen,
       label: fullscreenLabel,
     },
+    {
+      type: 'item',
+      key: MenuKeys.ChartFilters,
+      label: t('Filters'),
+    }, 
     {
       type: 'divider',
     },
@@ -553,6 +598,41 @@ const SliceHeaderControls = (
       ],
     });
   }
+  
+  const applyFilterToChart = (newFilter: any) => {
+	const existingFilters = props.formData.adhoc_filters || [];
+
+  const filtered = existingFilters.filter(
+    f => 'subject' in f && f.subject !== 'y_axis'
+  );
+
+  const updatedFormData = {
+    ...props.formData,
+    adhoc_filters: [...filtered, newFilter],
+    // only for showing pills in chart UI
+  ui_chart_filters: [
+    ...((formData as any).ui_chart_filters || []).filter(
+      (f: any) => f.subject !== newFilter.subject,
+    ),
+    newFilter,
+  ],
+  };
+
+  console.log('Updated FormData:', updatedFormData);
+
+  // Step 1: Update Redux state
+  dispatch(
+    updateQueryFormData(updatedFormData, props.slice.slice_id)
+  );
+
+  // Step 2: Tell Superset to re-run query
+  dispatch(
+    triggerQuery(true, props.slice.slice_id)
+  );
+
+  props.forceRefresh(props.slice.slice_id, props.dashboardId);
+
+};
 
   return (
     <>
@@ -593,6 +673,157 @@ const SliceHeaderControls = (
           <VerticalDotsTrigger />
         </Button>
       </NoAnimationDropdown>
+      <Modal
+  title="Chart Filters"
+  open={isFilterModalOpen}
+  onOk={() => {    
+    const isEmptyValue =
+  operator === 'IN' || operator === 'NOT IN'
+    ? !Array.isArray(value) || value.length === 0
+    : !value;
+
+if (!selectedColumn || !operator || isEmptyValue) {
+  props.addDangerToast('Please fill all fields');
+  return;
+}
+
+    console.log('Filter:', {
+      column: 'y_axis',
+      operator,
+      value,
+    });
+  //  const existingFilters = props.formData.adhoc_filters || [];
+//  const chart = useSelector((state: RootState) => state.charts[props.slice.slice_id]);
+  const formData = chart?.latestQueryFormData || props.formData;
+  //const existingFilters = props.formData.adhoc_filters || [];
+  const existingFilters = formData.adhoc_filters || [];
+  const filtered = existingFilters.filter(
+    f => !('subject' in f && f.subject === selectedColumn)
+  );
+
+  const newFilter: BinaryAdhocFilter = {
+    clause: 'WHERE',
+    subject: selectedColumn!,
+    operator: (operator ?? '==') as any,
+    comparator: operator === 'IN' || operator === 'NOT IN'
+    ? (value as any)
+    : (value as string),
+    expressionType: 'SIMPLE',
+   // filterOptionName: `filter_${Date.now()}`,
+  };
+
+  const updatedFormData = {
+    ...formData,
+    adhoc_filters: [...filtered, newFilter],
+  };
+  
+  //console.log("updatedFOrmData:", updatedFormData);
+  // 1. Update Redux formData
+  dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
+  dispatch(
+  postChartFormData(
+    updatedFormData,
+    true,
+    undefined,
+    props.slice.slice_id,
+    props.dashboardId,
+  )
+);
+  // 2. Trigger query
+//  dispatch(triggerQuery(false, props.slice.slice_id));
+  setIsFilterModalOpen(false);
+  }}
+  onCancel={() => setIsFilterModalOpen(false)}
+>
+  {/* Column (fixed) */}
+  <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 4, fontWeight: 500 }}>Column</div>
+    <Select
+  placeholder="Select column"
+  style={{ width: '100%' }}
+  value={selectedColumn || undefined}
+  onChange={
+    async val => {
+    setSelectedColumn(val);
+
+    // fetch values for selected column
+    setLoadingValues(true);
+
+    try {
+      // get dataset id from datasource
+//      const datasourceId = props.slice.datasource.split('__')[0];
+      const [datasourceId, datasourceType] = props.slice.datasource.split('__');
+      const res = await SupersetClient.get({
+        endpoint: `/api/v1/datasource/${datasourceType}/${datasourceId}/column/${val}/values/`,
+        //endpoint: `/api/v1/dataset/${datasourceId}/values/?column_name=${val}`,
+      });
+
+      const values =
+        res?.json?.result || [];
+      
+//      console.log("values:", values);
+      setValueOptions(values);
+    } catch (err) {
+      console.error('Error fetching values:', err);
+      setValueOptions([]);
+    }
+
+    setLoadingValues(false);
+  }
+  }
+  options={columnOptions}
+/>
+  </div>
+
+  {/* Operator */}
+  <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 4, fontWeight: 500 }}>Operator</div>
+    <Select
+      placeholder="Select operator"
+      style={{ width: '100%' }}
+      value={operator || undefined}
+      onChange={val => {
+              setOperator(val);
+              setValue(val === 'IN' || val === 'NOT IN' ? [] : '');
+      }}
+      options={[
+        { label: 'Equal to (=)', value: '==' },
+        { label: 'Not Equal to (!=)', value: '!=' },
+        { label: 'Greater Than (>)', value: '>' },
+        { label: 'Greater or equal (>=)', value: '>=' },
+        { label: 'Less Than (<)', value: '<' },
+        { label: 'Less or equal (<=)', value: '<=' },
+        { label: 'In', value: 'IN' },
+        { label: 'Not in', value: 'NOT IN' },
+      ]}
+    />
+  </div>
+
+  {/* Value */}
+  <div style={{ marginBottom: 8 }}>
+    <div style={{ marginBottom: 4, fontWeight: 500 }}>Value</div>
+    <Select
+  mode={operator === 'IN' || operator === 'NOT IN' ? 'tags' : undefined}
+  style={{ width: '100%' }}
+  placeholder="Select or type value"
+  value={
+    operator === 'IN' || operator === 'NOT IN'
+      ? (value as string[]) || []
+      : value || undefined
+  }
+  onChange={(vals) => {
+    if (operator === 'IN' || operator === 'NOT IN') {
+      setValue(vals); // array
+    } else {
+      setValue(vals);
+    }
+  }}
+  loading={loadingValues}
+  showSearch
+  options={valueOptions.map(v => ({ label: String(v), value: String(v) }))}
+/>
+  </div>
+</Modal>       
       <DrillDetailModal
         formData={props.formData}
         initialFilters={[]}
