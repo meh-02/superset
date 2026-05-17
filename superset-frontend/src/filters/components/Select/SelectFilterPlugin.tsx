@@ -138,6 +138,7 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
     filterBarOrientation,
     clearAllTrigger,
     onClearAllComplete,
+    lockedValues = [],
   } = props;
   const {
     enableEmptyFilter,
@@ -462,21 +463,41 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
 
   useEffect(() => {
     if (clearAllTrigger) {
-      dispatchDataMask({
-        type: 'filterState',
-        extraFormData: {},
-        filterState: {
-          value: undefined,
-          label: undefined,
-        },
-      });
+      // If this filter has locked values, reset to ONLY the locked values
+      // instead of wiping everything. Otherwise wipe normally.
+      if (lockedValues && lockedValues.length > 0) {
+        dispatchDataMask({
+          type: 'filterState',
+          extraFormData: getSelectExtraFormData(
+            col,
+            lockedValues as SelectValue,
+            false,
+            excludeFilterValues && inverseSelection,
+            operatorType,
+          ),
+          filterState: {
+            value: lockedValues as SelectValue,
+            label: lockedValues.join(', '),
+          },
+        });
+        updateDataMask(lockedValues as SelectValue);
+      } else {
+        dispatchDataMask({
+          type: 'filterState',
+          extraFormData: {},
+          filterState: {
+            value: undefined,
+            label: undefined,
+          },
+        });
+        updateDataMask(null);
+      }
 
-      updateDataMask(null);
       setSearch('');
       setLikeInputValue('');
       onClearAllComplete?.(formData.nativeFilterId);
     }
-  }, [clearAllTrigger, onClearAllComplete, updateDataMask]);
+  }, [clearAllTrigger, onClearAllComplete, updateDataMask, lockedValues]);
 
   useEffect(() => {
     if (prevExcludeFilterValues.current !== excludeFilterValues) {
@@ -573,9 +594,12 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
               onChange={handleExclusionToggle}
             />
           )}
-          {isLikeOperator ? (
+           {isLikeOperator ? (
             <Input
-              allowClear
+              allowClear={
+                lockedValues.length === 0 ||
+                !lockedValues.includes(likeInputValue as string)
+              }
               placeholder={likeInputPlaceholder}
               value={likeInputValue}
               onChange={handleLikeInputChange}
@@ -587,9 +611,17 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
               ref={inputRef}
             />
           ) : (
-            <Select
+              <Select
               name={formData.nativeFilterId}
-              allowClear
+              allowClear={(() => {
+                const valArr = ensureIsArray(filterState.value);
+                if (lockedValues.length === 0) return true;
+                if (valArr.length === 0) return true;
+                const allLocked = valArr.every(v =>
+                  lockedValues.includes(v as string | number),
+                );
+                return !allLocked;
+              })()}
               allowNewOptions={!searchAllOptions && creatable !== false}
               allowSelectAll={!searchAllOptions}
               value={multiSelect ? filterState.value || [] : filterState.value}
@@ -619,6 +651,30 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
               sortComparator={sortComparator}
               onOpenChange={setFilterActive}
               className="select-container"
+              tagRender={({ label, value, onClose }) => {
+                const isLocked = lockedValues.includes(
+                  value as string | number,
+                );
+                return (
+                  <span className="ant-select-selection-item">
+                    <span className="ant-select-selection-item-content">
+                      {label}
+                    </span>
+                    {!isLocked && (
+                      <span
+                        className="ant-select-selection-item-remove"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onClose();
+                        }}
+                        aria-hidden="true"
+                      >
+                        ×
+                      </span>
+                    )}
+                  </span>
+                );
+              }}
             />
           )}
         </StyledSpace>

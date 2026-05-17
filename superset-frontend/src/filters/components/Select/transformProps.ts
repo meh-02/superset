@@ -44,7 +44,7 @@ export default function transformProps(
     ...DEFAULT_FORM_DATA,
     ...(formData as PluginFilterSelectQueryFormData),
   };
-  const {
+   const {
     setDataMask = noOp,
     setHoveredFilter = noOp,
     unsetHoveredFilter = noOp,
@@ -53,6 +53,7 @@ export default function transformProps(
     setFilterActive = noOp,
     clearAllTrigger,
     onClearAllComplete,
+    lockedValues,
   } = hooks;
   const [queryData] = queriesData;
   const { colnames = [], coltypes = [], data = [] } = queryData || {};
@@ -82,5 +83,6 @@ export default function transformProps(
     isOverflowingFilterBar: displaySettings?.isOverflowingFilterBar,
     clearAllTrigger,
     onClearAllComplete,
+    lockedValues,
   };
 }

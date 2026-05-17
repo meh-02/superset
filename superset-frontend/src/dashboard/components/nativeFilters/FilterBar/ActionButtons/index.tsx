@@ -112,29 +112,37 @@ const ActionButtons = ({
 }: ActionButtonsProps) => {
   const isVertical = filterBarOrientation === FilterBarOrientation.Vertical;
 
-  const isClearAllEnabled = useMemo(() => {
+const isClearAllEnabled = useMemo(() => {
+    const lockedFilters = window.__supersetLockedFilters || {};
+
+    // A mask is "clearable" if it has a value AND that value is NOT
+    // entirely the locked (AHMS-seeded) value for that filter.
+    const isMaskClearable = (filterId: string, mask: any): boolean => {
+      const value = mask?.filterState?.value;
+      const hasGroupBy = isDefined(mask?.ownState?.column);
+      if (!isDefined(value) && !hasGroupBy) return false;
+      const locked: (string | number)[] = lockedFilters[filterId] || [];
+      if (locked.length === 0) {
+        return isDefined(value) || hasGroupBy;
+      }
+      const valArr = Array.isArray(value) ? value : [value];
+      // If every value matches the locked list exactly, nothing to clear.
+      const onlyLocked =
+        valArr.length === locked.length &&
+        valArr.every(v => locked.includes(v as string | number));
+      return !onlyLocked;
+    };
+
     const hasSelectedChanges = Object.entries(dataMaskSelected).some(
-      ([, mask]) => {
-        const hasValue = isDefined(mask?.filterState?.value);
-        const hasGroupBy = isDefined(mask?.ownState?.column);
-        return hasValue || hasGroupBy;
-      },
+      ([id, mask]) => isMaskClearable(id, mask),
     );
-
     const hasAppliedChanges = Object.entries(dataMaskApplied).some(
-      ([, mask]) => {
-        const hasValue = isDefined(mask?.filterState?.value);
-        const hasGroupBy = isDefined(mask?.ownState?.column);
-        return hasValue || hasGroupBy;
-      },
+      ([id, mask]) => isMaskClearable(id, mask),
     );
-
     const hasChartCustomizations = chartCustomizationItems?.some(item => {
       if (item.removed) return false;
       const mask = dataMaskApplied[item.id] || dataMaskSelected[item.id];
-      const hasValue = isDefined(mask?.filterState?.value);
-      const hasGroupBy = isDefined(mask?.ownState?.column);
-      return hasValue || hasGroupBy;
+      return isMaskClearable(item.id, mask);
     });
 
     return hasSelectedChanges || hasAppliedChanges || hasChartCustomizations;
@@ -146,7 +154,7 @@ const ActionButtons = ({
       width={width}
       data-test="filterbar-action-buttons"
     >
-      <Button
+       <Button
         disabled={isApplyDisabled}
         buttonStyle="primary"
         htmlType="submit"
@@ -166,6 +174,7 @@ const ActionButtons = ({
         >
           {t('Clear all')}
         </Button>
+
         {hasOutOfScopeRequiredFilters && (
           <Tooltip
             title={t(

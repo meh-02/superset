@@ -40,6 +40,7 @@ import {
   ClientErrorObject,
   getClientErrorObject,
   isChartCustomization,
+  ensureIsArray, 
 } from '@superset-ui/core';
 import { styled } from '@apache-superset/core/theme';
 import { useDispatch, useSelector } from 'react-redux';
@@ -139,6 +140,30 @@ const FilterValue: FC<FilterValueProps> = ({
   const [ownState, setOwnState] = useState<JsonObject>({});
   const [inViewFirstTime, setInViewFirstTime] = useState(inView);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initialLockedValues = useRef<(string | number)[]>(
+    (() => {
+      const fromDefault = ensureIsArray(
+        filter.defaultDataMask?.filterState?.value,
+      );
+      if (fromDefault.length) return fromDefault;
+      return ensureIsArray(filter.dataMask?.filterState?.value);
+    })(),
+  );
+   // Register this filter's locked values globally so the Clear all button
+  // can decide whether to clear it and whether to enable itself.
+  useEffect(() => {
+    if (!window.__supersetLockedFilters) {
+      window.__supersetLockedFilters = {};
+    }
+    if (initialLockedValues.current.length > 0) {
+      window.__supersetLockedFilters[filter.id] = initialLockedValues.current;
+    }
+    return () => {
+      if (window.__supersetLockedFilters) {
+        delete window.__supersetLockedFilters[filter.id];
+      }
+    };
+  }, [filter.id]);
   const [target] = targets || [];
   const {
     datasetId,
@@ -334,28 +359,29 @@ const FilterValue: FC<FilterValueProps> = ({
     }
   }, [dispatch, isCustomization]);
 
-  const hooks = useMemo(
-    () => ({
-      setDataMask,
-      setHoveredFilter,
-      unsetHoveredFilter,
-      setFocusedFilter,
-      unsetFocusedFilter,
-      setFilterActive,
-      clearAllTrigger,
-      onClearAllComplete,
-    }),
-    [
-      setDataMask,
-      setFilterActive,
-      setHoveredFilter,
-      unsetHoveredFilter,
-      setFocusedFilter,
-      unsetFocusedFilter,
-      clearAllTrigger,
-      onClearAllComplete,
-    ],
-  );
+    const hooks = useMemo(
+      () => ({
+        setDataMask,
+        setHoveredFilter,
+        unsetHoveredFilter,
+        setFocusedFilter,
+        unsetFocusedFilter,
+        setFilterActive,
+        clearAllTrigger,
+        onClearAllComplete,
+        lockedValues: initialLockedValues.current,
+      }),
+      [
+        setDataMask,
+        setFilterActive,
+        setHoveredFilter,
+        unsetHoveredFilter,
+        setFocusedFilter,
+        unsetFocusedFilter,
+        clearAllTrigger,
+        onClearAllComplete,      
+      ],
+    );
 
   const filterState = useMemo(
     () => ({

@@ -33,4 +33,7 @@ export interface PluginFilterHooks {
   setHoveredFilter: () => void;
   unsetHoveredFilter: () => void;
   setFilterActive: (isActive: boolean) => void;
+  clearAllTrigger?: Record<string, boolean>;
+  onClearAllComplete?: (filterId: string) => void;
+  lockedValues?: (string | number)[];
 }

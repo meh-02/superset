@@ -75,6 +75,7 @@ export type PluginFilterSelectProps = PluginFilterStylesProps & {
   isOverflowingFilterBar?: boolean;
   clearAllTrigger?: Record<string, boolean>;
   onClearAllComplete?: (filterId: string) => void;
+  lockedValues?: (string | number)[];
 } & PluginFilterHooks;
 
 export const DEFAULT_FORM_DATA: PluginFilterSelectCustomizeProps = {

@@ -304,6 +304,15 @@ const FilterBar: FC<FiltersBarProps> = ({
           },
         };
       });
+      const { filterState: fs, ...restMask } = dataMask;
+      const cleanedMask = fs
+        ? {
+            ...restMask,
+            filterState: { ...fs, validateStatus: undefined },
+          }
+        : dataMask;
+      dispatch(updateDataMask(filter.id, cleanedMask));
+
     },
     [
       dispatch,
@@ -494,6 +503,24 @@ const dataMaskAppliedText = JSON.stringify(dataMaskApplied);
 
       // Only clear in-scope filters
       if (!inScopeFilterIds.has(id)) return;
+
+      // AHMS: skip filters whose entire current value is locked
+      // (Zone/Circle/Division seeded via native_filters URL param).
+      const lockedFilters = window.__supersetLockedFilters || {};
+      const locked: (string | number)[] = lockedFilters[id] || [];
+      if (locked.length > 0) {
+        const currentValue = dataMaskSelected[id]?.filterState?.value;
+        const valArr = Array.isArray(currentValue)
+          ? currentValue
+          : currentValue !== undefined && currentValue !== null
+            ? [currentValue]
+            : [];
+        const onlyLocked =
+          valArr.length > 0 &&
+          valArr.length === locked.length &&
+          valArr.every(v => locked.includes(v as string | number));
+        if (onlyLocked) return;
+      }
 
       // Range filters use [null, null] as the cleared value; others use undefined
       const clearedValue =
