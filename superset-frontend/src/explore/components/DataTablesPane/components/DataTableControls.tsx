@@ -27,6 +27,7 @@ import {
 import { applyFormattingToTabularData } from 'src/utils/common';
 import { getTimeColumns } from 'src/explore/components/DataTableControl/utils';
 import RowCountLabel from 'src/components/RowCountLabel';
+import ModalDownloadDropdown from 'src/components/Chart/ModalDownloadDropdown';
 import { TableControlsProps } from '../types';
 
 export const TableControlsWrapper = styled.div`
@@ -51,6 +52,7 @@ export const TableControls = ({
   rowcount,
   isLoading,
   canDownload,
+  chartName,
 }: TableControlsProps) => {
   const originalTimeColumns = getTimeColumns(datasourceId);
   const formattedTimeColumns = zip<string, GenericDataType>(
@@ -80,7 +82,15 @@ export const TableControls = ({
       >
         <RowCountLabel rowcount={rowcount} loading={isLoading} />
         {canDownload && (
-          <CopyToClipboardButton data={formattedData} columns={columnNames} />
+          <>
+            <CopyToClipboardButton data={formattedData} columns={columnNames} />
+            <ModalDownloadDropdown
+              data={formattedData}
+              columnNames={columnNames}
+              fileName={chartName || 'chart-data'}
+              imageTargetSelector=".chart-data-modal-target"
+            />
+          </>
         )}
       </div>
     </TableControlsWrapper>

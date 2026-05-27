@@ -41,6 +41,7 @@ export const SingleQueryResultPane = ({
   canDownload,
   columnDisplayNames,
   isPaginationSticky = true,
+  chartName,
 }: SingleQueryResultPaneProp) => {
   const [filterText, setFilterText] = useState('');
 
@@ -64,7 +65,7 @@ export const SingleQueryResultPane = ({
   );
 
   return (
-    <>
+    <div className="chart-data-modal-target">
       <TableControls
         data={filteredData}
         columnNames={colnames}
@@ -74,6 +75,7 @@ export const SingleQueryResultPane = ({
         onInputChange={handleInputChange}
         isLoading={false}
         canDownload={canDownload}
+        chartName={chartName}
       />
       <TableView
         columns={columns}
@@ -87,6 +89,6 @@ export const SingleQueryResultPane = ({
         showRowCount={false}
         small
       />
-    </>
+    </div>
   );
 };

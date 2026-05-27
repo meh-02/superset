@@ -49,6 +49,7 @@ import Table, {
 import { RootState } from 'src/dashboard/types';
 import HeaderWithRadioGroup from '@superset-ui/core/components/Table/header-renderers/HeaderWithRadioGroup';
 import { useDatasetMetadataBar } from 'src/features/datasets/metadataBar/useDatasetMetadataBar';
+import { applyFormattingToTabularData } from 'src/utils/common';
 import { Dataset } from '../types';
 import TableControls from './DrillDetailTableControls';
 import { getDrillPayload } from './utils';
@@ -81,10 +82,12 @@ export default function DrillDetailPane({
   formData,
   initialFilters,
   dataset,
+  chartName,
 }: {
   formData: QueryFormData;
   initialFilters: BinaryQueryObjectFilterClause[];
   dataset?: Dataset;
+  chartName?: string;
 }) {
   const theme = useTheme();
   const [pageIndex, setPageIndex] = useState(0);
@@ -199,6 +202,15 @@ export default function DrillDetailPane({
       ) || [],
     [resultsPage?.colNames, resultsPage?.data],
   );
+
+  // Format temporal columns so CSV/Excel exports show dates instead of raw epochs.
+  const exportData = useMemo(() => {
+    if (!resultsPage) return [];
+    const temporalCols = resultsPage.colNames.filter(
+      (_, idx) => resultsPage.colTypes[idx] === GenericDataType.Temporal,
+    );
+    return applyFormattingToTabularData(data, temporalCols);
+  }, [data, resultsPage]);
 
   // Clear cache on reload button click
   const handleReload = useCallback(() => {
@@ -329,7 +341,15 @@ export default function DrillDetailPane({
   }
 
   return (
-    <>
+    <div
+      className="drill-detail-modal-target"
+      css={css`
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+      `}
+    >
       {!bootstrapping && metadataBarComponent}
       {!bootstrapping && (
         <TableControls
@@ -338,9 +358,12 @@ export default function DrillDetailPane({
           totalCount={resultsPage?.total}
           loading={isLoading}
           onReload={handleReload}
+          exportData={exportData}
+          exportColumnNames={resultsPage?.colNames || []}
+          chartName={chartName}
         />
       )}
       {tableContent}
-    </>
+    </div>
   );
 }

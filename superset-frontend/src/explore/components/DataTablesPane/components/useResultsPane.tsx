@@ -56,6 +56,7 @@ export const useResultsPane = ({
   dataSize = 50,
   canDownload,
   columnDisplayNames,
+  chartName,
 }: ResultsPaneProps): ReactElement[] => {
   const metadata = getChartMetadataRegistry().get(
     queryFormData?.viz_type || queryFormData?.vizType,
@@ -168,6 +169,7 @@ export const useResultsPane = ({
         isVisible={isVisible}
         canDownload={canDownload}
         columnDisplayNames={columnDisplayNames}
+        chartName={chartName}
       />
     </StyledDiv>
   ));

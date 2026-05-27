@@ -190,6 +190,10 @@ const SliceHeaderControls = (
   const [modalFilters, setFilters] = useState<BinaryQueryObjectFilterClause[]>(
     [],
   );
+  // Snapshot of the chart's original adhoc_filters captured on first mount.
+  // The Chart Filters modal's Clear all button reverts to this value so the
+  // chart's built-in (explore-configured) filters are preserved.
+  const originalAdhocFiltersRef = useRef(props.formData.adhoc_filters || []);
   const theme = useTheme();
 
   const canEditCrossFilters =
@@ -503,6 +507,7 @@ const SliceHeaderControls = (
               isVisible
               canDownload={!!props.supersetCanCSV}
               columnDisplayNames={datasetWithVerboseMap?.verbose_map}
+              chartName={slice.slice_name}
             />
           }
         />
@@ -599,6 +604,29 @@ const SliceHeaderControls = (
     });
   }
   
+  const handleClearAllChartFilters = () => {
+    const baseFormData = chart?.latestQueryFormData || props.formData;
+    const updatedFormData = {
+      ...baseFormData,
+      adhoc_filters: originalAdhocFiltersRef.current,
+    };
+    dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
+    dispatch(
+      postChartFormData(
+        updatedFormData,
+        true,
+        undefined,
+        props.slice.slice_id,
+        props.dashboardId,
+      ),
+    );
+    setSelectedColumn(null);
+    setOperator(null);
+    setValue('');
+    setValueOptions([]);
+    setIsFilterModalOpen(false);
+  };
+
   const applyFilterToChart = (newFilter: any) => {
 	const existingFilters = props.formData.adhoc_filters || [];
 
@@ -735,6 +763,23 @@ if (!selectedColumn || !operator || isEmptyValue) {
   }}
   onCancel={() => setIsFilterModalOpen(false)}
 >
+  {/* Clear-all (scoped to this chart's ad-hoc filters only) */}
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'flex-end',
+      marginBottom: 8,
+    }}
+  >
+    <Button
+      buttonStyle="link"
+      buttonSize="small"
+      onClick={handleClearAllChartFilters}
+    >
+      {t('Clear all')}
+    </Button>
+  </div>
+
   {/* Column (fixed) */}
   <div style={{ marginBottom: 16 }}>
     <div style={{ marginBottom: 4, fontWeight: 500 }}>Column</div>

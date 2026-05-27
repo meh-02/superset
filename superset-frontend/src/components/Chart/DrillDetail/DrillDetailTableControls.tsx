@@ -27,6 +27,7 @@ import {
 import { css, useTheme } from '@apache-superset/core/theme';
 import RowCountLabel from 'src/components/RowCountLabel';
 import { Icons } from '@superset-ui/core/components/Icons';
+import ModalDownloadDropdown from 'src/components/Chart/ModalDownloadDropdown';
 
 export type TableControlsProps = {
   filters: BinaryQueryObjectFilterClause[];
@@ -34,6 +35,9 @@ export type TableControlsProps = {
   totalCount?: number;
   loading: boolean;
   onReload: () => void;
+  exportData?: Record<string, any>[];
+  exportColumnNames?: string[];
+  chartName?: string;
 };
 
 export default function TableControls({
@@ -42,6 +46,9 @@ export default function TableControls({
   totalCount,
   loading,
   onReload,
+  exportData,
+  exportColumnNames,
+  chartName,
 }: TableControlsProps) {
   const theme = useTheme();
   const filterMap: Record<string, BinaryQueryObjectFilterClause> = useMemo(
@@ -128,6 +135,14 @@ export default function TableControls({
           role="button"
           onClick={onReload}
         />
+        {exportData && exportColumnNames && (
+          <ModalDownloadDropdown
+            data={exportData}
+            columnNames={exportColumnNames}
+            fileName={chartName || 'drill-to-detail'}
+            imageTargetSelector=".drill-detail-modal-target"
+          />
+        )}
       </div>
     </div>
   );

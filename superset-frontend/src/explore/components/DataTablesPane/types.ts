@@ -51,6 +51,7 @@ export interface ResultsPaneProps {
   canDownload: boolean;
   // Optional map of column/metric name -> verbose label
   columnDisplayNames?: Record<string, string>;
+  chartName?: string;
 }
 
 export interface SamplesPaneProps {
@@ -74,6 +75,7 @@ export interface TableControlsProps {
   isLoading: boolean;
   rowcount: number;
   canDownload: boolean;
+  chartName?: string;
 }
 
 export interface QueryResultInterface {
@@ -93,4 +95,5 @@ export interface SingleQueryResultPaneProp extends QueryResultInterface {
   // Optional map of column/metric name -> verbose label
   columnDisplayNames?: Record<string, string>;
   isPaginationSticky?: boolean;
+  chartName?: string;
 }
