@@ -109,6 +109,7 @@ export const DYNAMIC_PLUGIN_CONTROLS_READY =
 export const TRIGGER_QUERY = 'TRIGGER_QUERY' as const;
 export const RENDER_TRIGGERED = 'RENDER_TRIGGERED' as const;
 export const UPDATE_QUERY_FORM_DATA = 'UPDATE_QUERY_FORM_DATA' as const;
+export const UPDATE_CHART_FORM_DATA = 'UPDATE_CHART_FORM_DATA' as const;
 export const UPDATE_CHART_ID = 'UPDATE_CHART_ID' as const;
 export const ADD_CHART = 'ADD_CHART' as const;
 
@@ -675,6 +676,17 @@ export function updateQueryFormData(
   key: string | number,
 ): UpdateQueryFormDataAction {
   return { type: UPDATE_QUERY_FORM_DATA, value, key };
+}
+
+// Updates the chart's stored form_data (the source of truth for re-renders
+// in the dashboard Chart container). Use this when a runtime control needs
+// the chart to permanently pick up new form_data values for the rest of the
+// session — e.g. the Chart Filters modal applying an ad-hoc filter override.
+export function updateChartFormData(
+  value: QueryFormData,
+  key: string | number,
+) {
+  return { type: UPDATE_CHART_FORM_DATA, value, key };
 }
 
 // in the sql lab -> explore flow, user can inline edit chart title,

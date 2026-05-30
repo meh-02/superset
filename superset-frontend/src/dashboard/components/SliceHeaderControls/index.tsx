@@ -65,10 +65,23 @@ import { useCrossFiltersScopingModal } from '../nativeFilters/FilterBar/CrossFil
 import { ViewResultsModalTrigger } from './ViewResultsModalTrigger';
 import AdhocFilter from 'src/explore/components/controls/FilterControl/AdhocFilter';
 import AdhocFilterPopoverTrigger from 'src/explore/components/controls/FilterControl/AdhocFilterPopoverTrigger';
-import { 
+import {
+  CommonFrame,
+  CalendarFrame,
+  CustomFrame,
+  AdvancedFrame,
+} from 'src/explore/components/controls/DateFilterControl/components';
+import { CurrentCalendarFrame } from 'src/explore/components/controls/DateFilterControl/components/CurrentCalendarFrame';
+import {
+  FRAME_OPTIONS,
+  guessFrame,
+} from 'src/explore/components/controls/DateFilterControl/utils';
+import type { FrameType } from 'src/explore/components/controls/DateFilterControl/types';
+import {
   updateQueryFormData,
+  updateChartFormData,
   triggerQuery,
-  postChartFormData 
+  postChartFormData,
 } from 'src/components/Chart/chartAction';
 
 const RefreshTooltip = styled.div`
@@ -175,7 +188,9 @@ const SliceHeaderControls = (
   '==' | '!=' | '>' | '<' | '>=' | '<=' | 'IN' | 'NOT IN' | null
 >(null);
   const [value, setValue] = useState<string | string[]>('');
-  const [isFilterOpen, setIsFilterOpen] = useState(false); 
+  const [timeRange, setTimeRange] = useState<string>('No filter');
+  const [frame, setFrame] = useState<FrameType>('No filter');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [openScopingModal, scopingModal] = useCrossFiltersScopingModal(
     props.slice.slice_id,
   );
@@ -194,6 +209,12 @@ const SliceHeaderControls = (
   // The Chart Filters modal's Clear all button reverts to this value so the
   // chart's built-in (explore-configured) filters are preserved.
   const originalAdhocFiltersRef = useRef(props.formData.adhoc_filters || []);
+  // Snapshot the chart's original time_range too. Clear all needs to restore
+  // it because the temporal onOk branch overrides time_range when applying a
+  // TEMPORAL_RANGE filter.
+  const originalTimeRangeRef = useRef(
+    (props.formData as any).time_range ?? 'No filter',
+  );
   const theme = useTheme();
 
   const canEditCrossFilters =
@@ -228,6 +249,18 @@ const SliceHeaderControls = (
   label: datasetWithVerboseMap?.verbose_map?.[col] || col,
   value: col,
 }));
+
+  // Auto-detect temporal columns from the chart's own dataset metadata.
+  // The Chart Filters modal swaps Operator+Value for the Explore-style
+  // time-range picker whenever the picked column has is_dttm === true.
+  const temporalColumns = new Set(
+    (datasetWithVerboseMap?.columns || [])
+      .filter((c: any) => c?.is_dttm)
+      .map((c: any) => c.column_name),
+  );
+  const isTemporal = selectedColumn
+    ? temporalColumns.has(selectedColumn)
+    : false;
 
   console.log("column options :", columnOptions);
 
@@ -476,7 +509,13 @@ const SliceHeaderControls = (
             <div data-test="view-query-menu-item">{t('View query')}</div>
           }
           modalTitle={t('View query')}
-          modalBody={<ViewQueryModal latestQueryFormData={props.formData} />}
+          modalBody={
+            <ViewQueryModal
+              latestQueryFormData={
+                chart?.latestQueryFormData || props.formData
+              }
+            />
+          }
           draggable
           resizable
           responsive
@@ -609,7 +648,11 @@ const SliceHeaderControls = (
     const updatedFormData = {
       ...baseFormData,
       adhoc_filters: originalAdhocFiltersRef.current,
+      time_range: originalTimeRangeRef.current,
     };
+    // Mirror the dispatch pattern used in onOk so the chart actually
+    // re-renders to its original filters (not just the next fetch).
+    dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
     dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
     dispatch(
       postChartFormData(
@@ -624,6 +667,8 @@ const SliceHeaderControls = (
     setOperator(null);
     setValue('');
     setValueOptions([]);
+    setTimeRange('No filter');
+    setFrame('No filter');
     setIsFilterModalOpen(false);
   };
 
@@ -702,9 +747,75 @@ const SliceHeaderControls = (
         </Button>
       </NoAnimationDropdown>
       <Modal
-  title="Chart Filters"
+  title={
+    <div>
+      <div style={{ fontWeight: 600 }}>{t('Chart Filters')}</div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 400,
+          opacity: 0.7,
+          marginTop: 2,
+        }}
+        title={slice.slice_name}
+      >
+        {slice.slice_name}
+      </div>
+    </div>
+  }
+  width={520}
+  centered
   open={isFilterModalOpen}
-  onOk={() => {    
+  onOk={() => {
+    // Temporal branch: column is a date (is_dttm). Use DateFilterControl's
+    // emitted string verbatim as the TEMPORAL_RANGE comparator — Superset's
+    // backend already knows every format the picker can produce.
+    if (isTemporal) {
+      if (!selectedColumn || !timeRange || timeRange === 'No filter') {
+        props.addDangerToast('Please pick a column and a time range');
+        return;
+      }
+      const formData = chart?.latestQueryFormData || props.formData;
+      const existingFilters = formData.adhoc_filters || [];
+      const filtered = existingFilters.filter(
+        f => !('subject' in f && f.subject === selectedColumn),
+      );
+      const newFilter: BinaryAdhocFilter = {
+        clause: 'WHERE',
+        subject: selectedColumn!,
+        operator: 'TEMPORAL_RANGE' as any,
+        comparator: timeRange,
+        expressionType: 'SIMPLE',
+      };
+      // Also set the chart's time_range to the same value. Superset's
+      // backend builds the WHERE clause for temporal columns from the
+      // (from_dttm, to_dttm) bounds derived from time_range — leaving
+      // time_range as "No filter" causes the TEMPORAL_RANGE filter to be
+      // silently dropped from the SQL even though it's present in
+      // adhoc_filters.
+      const updatedFormData = {
+        ...formData,
+        adhoc_filters: [...filtered, newFilter],
+        time_range: timeRange,
+      };
+      // Persist the override on the chart's form_data so the dashboard
+      // Chart container re-renders with the new filter (it reads from
+      // chart.form_data, not latestQueryFormData).
+      dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
+      dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
+      dispatch(
+        postChartFormData(
+          updatedFormData,
+          true,
+          undefined,
+          props.slice.slice_id,
+          props.dashboardId,
+        ),
+      );
+      setIsFilterModalOpen(false);
+      return;
+    }
+
     const isEmptyValue =
   operator === 'IN' || operator === 'NOT IN'
     ? !Array.isArray(value) || value.length === 0
@@ -745,8 +856,9 @@ if (!selectedColumn || !operator || isEmptyValue) {
     adhoc_filters: [...filtered, newFilter],
   };
   
-  //console.log("updatedFOrmData:", updatedFormData);
-  // 1. Update Redux formData
+  // Persist on chart.form_data so the dashboard Chart container re-renders
+  // with the filter (it reads from chart.form_data, not latestQueryFormData).
+  dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
   dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
   dispatch(
   postChartFormData(
@@ -757,8 +869,6 @@ if (!selectedColumn || !operator || isEmptyValue) {
     props.dashboardId,
   )
 );
-  // 2. Trigger query
-//  dispatch(triggerQuery(false, props.slice.slice_id));
   setIsFilterModalOpen(false);
   }}
   onCancel={() => setIsFilterModalOpen(false)}
@@ -820,55 +930,103 @@ if (!selectedColumn || !operator || isEmptyValue) {
 />
   </div>
 
-  {/* Operator */}
-  <div style={{ marginBottom: 16 }}>
-    <div style={{ marginBottom: 4, fontWeight: 500 }}>Operator</div>
-    <Select
-      placeholder="Select operator"
-      style={{ width: '100%' }}
-      value={operator || undefined}
-      onChange={val => {
-              setOperator(val);
-              setValue(val === 'IN' || val === 'NOT IN' ? [] : '');
-      }}
-      options={[
-        { label: 'Equal to (=)', value: '==' },
-        { label: 'Not Equal to (!=)', value: '!=' },
-        { label: 'Greater Than (>)', value: '>' },
-        { label: 'Greater or equal (>=)', value: '>=' },
-        { label: 'Less Than (<)', value: '<' },
-        { label: 'Less or equal (<=)', value: '<=' },
-        { label: 'In', value: 'IN' },
-        { label: 'Not in', value: 'NOT IN' },
-      ]}
-    />
-  </div>
+  {/* Operator + Value: only for non-temporal columns. */}
+  {!isTemporal && (
+    <>
+      {/* Operator */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 4, fontWeight: 500 }}>Operator</div>
+        <Select
+          placeholder="Select operator"
+          style={{ width: '100%' }}
+          value={operator || undefined}
+          onChange={val => {
+                  setOperator(val);
+                  setValue(val === 'IN' || val === 'NOT IN' ? [] : '');
+          }}
+          options={[
+            { label: 'Equal to (=)', value: '==' },
+            { label: 'Not Equal to (!=)', value: '!=' },
+            { label: 'Greater Than (>)', value: '>' },
+            { label: 'Greater or equal (>=)', value: '>=' },
+            { label: 'Less Than (<)', value: '<' },
+            { label: 'Less or equal (<=)', value: '<=' },
+            { label: 'In', value: 'IN' },
+            { label: 'Not in', value: 'NOT IN' },
+          ]}
+        />
+      </div>
 
-  {/* Value */}
-  <div style={{ marginBottom: 8 }}>
-    <div style={{ marginBottom: 4, fontWeight: 500 }}>Value</div>
-    <Select
-  mode={operator === 'IN' || operator === 'NOT IN' ? 'tags' : undefined}
-  style={{ width: '100%' }}
-  placeholder="Select or type value"
-  value={
-    operator === 'IN' || operator === 'NOT IN'
-      ? (value as string[]) || []
-      : value || undefined
-  }
-  onChange={(vals) => {
-    if (operator === 'IN' || operator === 'NOT IN') {
-      setValue(vals); // array
-    } else {
-      setValue(vals);
-    }
-  }}
-  loading={loadingValues}
-  showSearch
-  options={valueOptions.map(v => ({ label: String(v), value: String(v) }))}
-/>
-  </div>
-</Modal>       
+      {/* Value */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 4, fontWeight: 500 }}>Value</div>
+        <Select
+      mode={operator === 'IN' || operator === 'NOT IN' ? 'tags' : undefined}
+      style={{ width: '100%' }}
+      placeholder="Select or type value"
+      value={
+        operator === 'IN' || operator === 'NOT IN'
+          ? (value as string[]) || []
+          : value || undefined
+      }
+      onChange={(vals) => {
+        if (operator === 'IN' || operator === 'NOT IN') {
+          setValue(vals); // array
+        } else {
+          setValue(vals);
+        }
+      }}
+      loading={loadingValues}
+      showSearch
+      options={valueOptions.map(v => ({ label: String(v), value: String(v) }))}
+    />
+      </div>
+    </>
+  )}
+
+  {/* Time range: only for temporal columns (auto-detected via is_dttm).
+      Renders the full "Edit time range" UI inline (Range type +
+      per-frame editor), mirroring DateFilterLabel's popover content but
+      without the popover wrapper so it lives directly inside the modal. */}
+  {isTemporal && (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ marginBottom: 4, fontWeight: 500 }}>{t('Time range')}</div>
+
+      {/* Range type */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 4 }}>{t('Range type')}</div>
+        <Select
+          style={{ width: '100%' }}
+          options={FRAME_OPTIONS}
+          value={frame}
+          onChange={(val: FrameType) => {
+            setFrame(val);
+            if (val === 'No filter') {
+              setTimeRange('No filter');
+            }
+          }}
+        />
+      </div>
+
+      {/* The selected frame's editor */}
+      {frame === 'Common' && (
+        <CommonFrame value={timeRange} onChange={setTimeRange} />
+      )}
+      {frame === 'Calendar' && (
+        <CalendarFrame value={timeRange} onChange={setTimeRange} />
+      )}
+      {frame === 'Current' && (
+        <CurrentCalendarFrame value={timeRange} onChange={setTimeRange} />
+      )}
+      {frame === 'Advanced' && (
+        <AdvancedFrame value={timeRange} onChange={setTimeRange} />
+      )}
+      {frame === 'Custom' && (
+        <CustomFrame value={timeRange} onChange={setTimeRange} />
+      )}
+    </div>
+  )}
+</Modal>
       <DrillDetailModal
         formData={props.formData}
         initialFilters={[]}

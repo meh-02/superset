@@ -421,6 +421,7 @@ class DatasetCacheWarmUpResponseSchema(Schema):
 class DatasetColumnDrillInfoSchema(Schema):
     column_name = fields.String(required=True)
     verbose_name = fields.String(required=False)
+    is_dttm = fields.Boolean(required=False)
 
 
 class UserSchema(Schema):
