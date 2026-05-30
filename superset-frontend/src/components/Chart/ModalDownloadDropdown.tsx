@@ -25,31 +25,34 @@ import { Icons } from '@superset-ui/core/components/Icons';
 import { useToasts } from 'src/components/MessageToasts/withToasts';
 import downloadAsImage from 'src/utils/downloadAsImage';
 
-enum MenuKey {
-  Csv = 'csv',
-  Excel = 'excel',
-  Image = 'image',
+enum DownloadMenuKeys {
+  Csv = 'modal-download-csv',
+  Excel = 'modal-download-excel',
+  Image = 'modal-download-image',
 }
 
 export interface ModalDownloadDropdownProps {
   data: Record<string, any>[];
   columnNames: string[];
   fileName: string;
-  // Selector for the modal body to screenshot.
-  // Resolved via document.querySelector — must be unique.
+  // CSS selector resolved via .closest() from the click target;
+  // must uniquely identify the modal body wrapper to screenshot.
   imageTargetSelector: string;
 }
 
 const sanitizeFileName = (name: string) =>
   (name || 'chart-data').replace(/[\\/:*?"<>|]/g, '_').trim() || 'chart-data';
 
-const buildSheet = (data: Record<string, any>[], columnNames: string[]) => {
-  const header = columnNames?.length
+const buildWorksheet = (
+  data: Record<string, any>[],
+  columnNames: string[],
+) => {
+  const safeCols = columnNames?.length
     ? columnNames
     : data?.[0]
       ? Object.keys(data[0])
       : [];
-  return utils.json_to_sheet(data ?? [], { header });
+  return utils.json_to_sheet(data ?? [], { header: safeCols });
 };
 
 export const ModalDownloadDropdown = ({
@@ -62,37 +65,59 @@ export const ModalDownloadDropdown = ({
   const { addDangerToast } = useToasts();
   const safeName = sanitizeFileName(fileName);
 
-  const writeBook = useCallback(
-    (ext: 'csv' | 'xlsx') => {
+  const onExportCsv = useCallback(() => {
+    try {
+      const sheet = buildWorksheet(data, columnNames);
       const book = utils.book_new();
-      utils.book_append_sheet(book, buildSheet(data, columnNames), 'Data');
-      writeFile(
-        book,
-        `${safeName}.${ext}`,
-        ext === 'csv' ? { bookType: 'csv' } : undefined,
-      );
-    },
-    [data, columnNames, safeName],
-  );
+      utils.book_append_sheet(book, sheet, 'Data');
+      writeFile(book, `${safeName}.csv`, { bookType: 'csv' });
+    } catch (e) {
+      addDangerToast(t('Sorry, something went wrong. Try again later.'));
+    }
+  }, [data, columnNames, safeName, addDangerToast]);
 
-  const handleClick = useCallback(
-    ({ key, domEvent }: { key: Key; domEvent: SyntheticEvent }) => {
+  const onExportExcel = useCallback(() => {
+    try {
+      const sheet = buildWorksheet(data, columnNames);
+      const book = utils.book_new();
+      utils.book_append_sheet(book, sheet, 'Data');
+      writeFile(book, `${safeName}.xlsx`);
+    } catch (e) {
+      addDangerToast(t('Sorry, something went wrong. Try again later.'));
+    }
+  }, [data, columnNames, safeName, addDangerToast]);
+
+  const onDownloadImage = useCallback(
+    (domEvent: SyntheticEvent) => {
       try {
-        if (key === MenuKey.Csv) writeBook('csv');
-        else if (key === MenuKey.Excel) writeBook('xlsx');
-        else if (key === MenuKey.Image) {
-          // isExactSelector=true so the lookup is document.querySelector,
-          // because the dropdown menu item is portaled outside the modal.
-          downloadAsImage(imageTargetSelector, safeName, true, theme)(domEvent);
-        }
-      } catch {
+        downloadAsImage(imageTargetSelector, safeName, false, theme)(domEvent);
+      } catch (e) {
         addDangerToast(t('Sorry, something went wrong. Try again later.'));
       }
     },
-    [writeBook, imageTargetSelector, safeName, theme, addDangerToast],
+    [imageTargetSelector, safeName, theme, addDangerToast],
   );
 
-  const iconCss = css`
+  const handleMenuClick = useCallback(
+    ({ key, domEvent }: { key: Key; domEvent: SyntheticEvent }) => {
+      switch (key) {
+        case DownloadMenuKeys.Csv:
+          onExportCsv();
+          break;
+        case DownloadMenuKeys.Excel:
+          onExportExcel();
+          break;
+        case DownloadMenuKeys.Image:
+          onDownloadImage(domEvent);
+          break;
+        default:
+          break;
+      }
+    },
+    [onExportCsv, onExportExcel, onDownloadImage],
+  );
+
+  const iconStyles = css`
     &&.anticon > .anticon:first-child {
       margin-right: 0;
       vertical-align: 0;
@@ -103,23 +128,23 @@ export const ModalDownloadDropdown = ({
     <Dropdown
       trigger={['click']}
       menu={{
-        onClick: handleClick,
+        onClick: handleMenuClick,
         selectable: false,
         items: [
           {
-            key: MenuKey.Csv,
+            key: DownloadMenuKeys.Csv,
             label: t('Export to .CSV'),
-            icon: <Icons.FileOutlined css={iconCss} />,
+            icon: <Icons.FileOutlined css={iconStyles} />,
           },
           {
-            key: MenuKey.Excel,
+            key: DownloadMenuKeys.Excel,
             label: t('Export to Excel'),
-            icon: <Icons.FileOutlined css={iconCss} />,
+            icon: <Icons.FileOutlined css={iconStyles} />,
           },
           {
-            key: MenuKey.Image,
+            key: DownloadMenuKeys.Image,
             label: t('Download as image'),
-            icon: <Icons.FileImageOutlined css={iconCss} />,
+            icon: <Icons.FileImageOutlined css={iconStyles} />,
           },
         ],
       }}

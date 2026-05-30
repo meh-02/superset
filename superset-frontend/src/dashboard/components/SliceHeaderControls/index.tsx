@@ -234,10 +234,6 @@ const SliceHeaderControls = (
     !canDrillToDetail,
   );
   const chart = useSelector((state: RootState) => state.charts[props.slice.slice_id]);
-  console.log(
-  'Applied Filters:',
-  chart?.latestQueryFormData?.adhoc_filters
-);  
   const datasetWithVerboseMap =
     datasetResource.status === ResourceStatus.Complete
       ? datasetResource.result
@@ -873,6 +869,7 @@ if (!selectedColumn || !operator || isEmptyValue) {
   }}
   onCancel={() => setIsFilterModalOpen(false)}
 >
+
   {/* Clear-all (scoped to this chart's ad-hoc filters only) */}
   <div
     style={{
@@ -916,7 +913,6 @@ if (!selectedColumn || !operator || isEmptyValue) {
       const values =
         res?.json?.result || [];
       
-//      console.log("values:", values);
       setValueOptions(values);
     } catch (err) {
       console.error('Error fetching values:', err);
