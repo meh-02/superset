@@ -16,15 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  cloneElement,
-  ReactElement,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { t } from '@apache-superset/core/translation';
 import {
@@ -36,18 +28,15 @@ import {
 } from '@superset-ui/core';
 import { css, useTheme } from '@apache-superset/core/theme';
 import { GenericDataType } from '@apache-superset/core/common';
-import { useResizeDetector } from 'react-resize-detector';
-import BooleanCell from '@superset-ui/core/components/Table/cell-renderers/BooleanCell';
-import NullCell from '@superset-ui/core/components/Table/cell-renderers/NullCell';
-import TimeCell from '@superset-ui/core/components/Table/cell-renderers/TimeCell';
-import { EmptyState, Loading } from '@superset-ui/core/components';
+import {
+  EmptyState,
+  EmptyWrapperType,
+  Loading,
+  TableView,
+} from '@superset-ui/core/components';
 import { getDatasourceSamples } from 'src/components/Chart/chartAction';
-import Table, {
-  ColumnsType,
-  TableSize,
-} from '@superset-ui/core/components/Table';
 import { RootState } from 'src/dashboard/types';
-import HeaderWithRadioGroup from '@superset-ui/core/components/Table/header-renderers/HeaderWithRadioGroup';
+import { useTableColumns } from 'src/explore/components/DataTableControl';
 import { useDatasetMetadataBar } from 'src/features/datasets/metadataBar/useDatasetMetadataBar';
 import { applyFormattingToTabularData } from 'src/utils/common';
 import { Dataset } from '../types';
@@ -56,27 +45,6 @@ import { getDrillPayload } from './utils';
 import { ResultsPage } from './types';
 
 const PAGE_SIZE = 50;
-
-interface DataType {
-  [key: string]: any;
-}
-
-// Must be outside of the main component due to problems in
-// react-resize-detector with conditional rendering
-// https://github.com/maslianok/react-resize-detector/issues/178
-function Resizable({ children }: { children: ReactElement }) {
-  const { ref, height } = useResizeDetector();
-  return (
-    <div ref={ref} css={{ flex: 1 }}>
-      {cloneElement(children, { height })}
-    </div>
-  );
-}
-
-enum TimeFormatting {
-  Original,
-  Formatted,
-}
 
 export default function DrillDetailPane({
   formData,
@@ -91,6 +59,8 @@ export default function DrillDetailPane({
 }) {
   const theme = useTheme();
   const [pageIndex, setPageIndex] = useState(0);
+  // Cached previous page index so we can keep rendering the prior page's
+  // data while a new page is being fetched (avoids a "blank" frame).
   const lastPageIndex = useRef(pageIndex);
   const [filters, setFilters] = useState(initialFilters);
   const [isLoading, setIsLoading] = useState(false);
@@ -98,9 +68,9 @@ export default function DrillDetailPane({
   const [resultsPages, setResultsPages] = useState<Map<number, ResultsPage>>(
     new Map(),
   );
-  const [timeFormatting, setTimeFormatting] = useState<
-    Record<string, TimeFormatting>
-  >({});
+  // Forces TableView to remount when filters change or reload is clicked, so
+  // its internal react-table pagination state resets to initialPageIndex=0.
+  const [dataSetVersion, setDataSetVersion] = useState(0);
 
   const dashboardId = useSelector<RootState, number>(
     ({ dashboardInfo }) => dashboardInfo.id,
@@ -111,7 +81,7 @@ export default function DrillDetailPane({
       state.common.conf.SAMPLES_ROW_LIMIT,
   );
 
-  // Extract datasource ID/type from string ID
+  // Extract datasource ID/type from compound string ID like "1__table"
   const [datasourceId, datasourceType] = useMemo(
     () => formData.datasource.split('__'),
     [formData.datasource],
@@ -128,82 +98,39 @@ export default function DrillDetailPane({
       lastPageIndex.current = pageIndex;
       return nextResultsPage;
     }
-
     return resultsPages.get(lastPageIndex.current);
   }, [pageIndex, resultsPages]);
 
-  const mappedColumns: ColumnsType<DataType> = useMemo(
+  // Shape current page rows as an array of objects keyed by column name —
+  // matches what react-table (via useTableColumns) expects.
+  const data = useMemo(
     () =>
-      resultsPage?.colNames.map((column, index) => ({
-        key: column,
-        dataIndex: column,
-        title:
-          resultsPage?.colTypes[index] === GenericDataType.Temporal ? (
-            <HeaderWithRadioGroup
-              headerTitle={dataset?.verbose_map?.[column] || column}
-              groupTitle={t('Formatting')}
-              groupOptions={[
-                { label: t('Original value'), value: TimeFormatting.Original },
-                {
-                  label: t('Formatted value'),
-                  value: TimeFormatting.Formatted,
-                },
-              ]}
-              value={
-                timeFormatting[column] === TimeFormatting.Original
-                  ? TimeFormatting.Original
-                  : TimeFormatting.Formatted
-              }
-              onChange={value =>
-                setTimeFormatting(state => ({
-                  ...state,
-                  [column]: parseInt(value, 10) as TimeFormatting,
-                }))
-              }
-            />
-          ) : (
-            dataset?.verbose_map?.[column] || column
-          ),
-        render: value => {
-          if (value === true || value === false) {
-            return <BooleanCell value={value} />;
-          }
-          if (value === null) {
-            return <NullCell />;
-          }
-          if (
-            resultsPage?.colTypes[index] === GenericDataType.Temporal &&
-            timeFormatting[column] !== TimeFormatting.Original &&
-            (typeof value === 'number' || value instanceof Date)
-          ) {
-            return <TimeCell value={value} />;
-          }
-          return String(value);
-        },
-        width: 150,
-      })) || [],
-    [
-      resultsPage?.colNames,
-      resultsPage?.colTypes,
-      timeFormatting,
-      dataset?.verbose_map,
-    ],
-  );
-
-  const data: DataType[] = useMemo(
-    () =>
-      resultsPage?.data.map((row, index) =>
+      resultsPage?.data.map(row =>
         resultsPage?.colNames.reduce(
           (acc, curr) => ({ ...acc, [curr]: row[curr] }),
-          {
-            key: index,
-          },
+          {} as Record<string, any>,
         ),
       ) || [],
     [resultsPage?.colNames, resultsPage?.data],
   );
 
-  // Format temporal columns so CSV/Excel exports show dates instead of raw epochs.
+  // Build TableView columns using the same helper View-as-table uses —
+  // ensures identical rendering / formatting for the temporal, boolean,
+  // null and HTML cells.
+  const allowHTML = formData.allow_render_html ?? true;
+  const columns = useTableColumns(
+    resultsPage?.colNames,
+    resultsPage?.colTypes,
+    data,
+    formData.datasource,
+    !!resultsPage,
+    {},
+    allowHTML,
+    dataset?.verbose_map,
+  );
+
+  // Format temporal columns so CSV/Excel exports show dates instead of raw
+  // epochs.
   const exportData = useMemo(() => {
     if (!resultsPage) return [];
     const temporalCols = resultsPage.colNames.filter(
@@ -217,6 +144,7 @@ export default function DrillDetailPane({
     setResponseError('');
     setResultsPages(new Map());
     setPageIndex(0);
+    setDataSetVersion(v => v + 1);
   }, []);
 
   // Clear cache and reset page index if filters change
@@ -224,9 +152,10 @@ export default function DrillDetailPane({
     setResponseError('');
     setResultsPages(new Map());
     setPageIndex(0);
+    setDataSetVersion(v => v + 1);
   }, [filters]);
 
-  // Update cache order if page in cache
+  // Update cache order if page in cache (LRU)
   useEffect(() => {
     if (
       resultsPages.has(pageIndex) &&
@@ -296,11 +225,8 @@ export default function DrillDetailPane({
 
   const bootstrapping = !responseError && !resultsPages.size;
 
-  const allowHTML = formData.allow_render_html ?? true;
-
   let tableContent = null;
   if (responseError) {
-    // Render error if page download failed
     tableContent = (
       <pre
         css={css`
@@ -311,32 +237,36 @@ export default function DrillDetailPane({
       </pre>
     );
   } else if (bootstrapping) {
-    // Render loading if first page hasn't loaded
     tableContent = <Loading />;
   } else if (resultsPage?.total === 0) {
-    // Render empty state if no results are returned for page
-    const title = t('No rows were returned for this dataset');
-    tableContent = <EmptyState image="document.svg" title={title} />;
-  } else {
-    // Render table if at least one page has successfully loaded
     tableContent = (
-      <Resizable>
-        <Table
-          data={data}
-          columns={mappedColumns}
-          size={TableSize.Small}
-          defaultPageSize={PAGE_SIZE}
-          recordCount={resultsPage?.total}
-          usePagination
-          loading={isLoading}
-          onChange={pagination =>
-            setPageIndex(pagination.current ? pagination.current - 1 : 0)
-          }
-          resizable
-          virtualize
-          allowHTML={allowHTML}
-        />
-      </Resizable>
+      <EmptyState
+        image="document.svg"
+        title={t('No rows were returned for this dataset')}
+      />
+    );
+  } else {
+    // TableView is the same component View-as-table uses. Its native
+    // server-side pagination support drives `setPageIndex`, which feeds
+    // back into the existing page-fetch effect above. Remount-on-filter-
+    // change (via `dataSetVersion` key) resets react-table's internal
+    // pageIndex to the initial value (0).
+    tableContent = (
+      <TableView
+        key={dataSetVersion}
+        columns={columns}
+        data={data}
+        pageSize={PAGE_SIZE}
+        serverPagination
+        totalCount={resultsPage?.total ?? 0}
+        initialPageIndex={pageIndex}
+        onServerPagination={({ pageIndex: p }) => setPageIndex(p)}
+        loading={isLoading}
+        emptyWrapperType={EmptyWrapperType.Small}
+        showRowCount={false}
+        scrollTable
+        small
+      />
     );
   }
 
