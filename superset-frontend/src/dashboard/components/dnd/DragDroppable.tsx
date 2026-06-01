@@ -104,7 +104,7 @@ const DragDroppableStyles = styled.div`
    
     &.dragdroppable--edit-mode {
       transform: translate3d(0,0,0);
-      overflow: hidden;
+//      overflow: hidden;
     }
     
     &.dragdroppable--edit-mode:hover {
