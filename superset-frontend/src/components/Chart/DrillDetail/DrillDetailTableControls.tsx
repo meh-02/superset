@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import { Input } from 'antd';
 import { Tag } from 'src/components/Tag';
 import { t } from '@apache-superset/core/translation';
 import {
@@ -38,6 +39,8 @@ export type TableControlsProps = {
   exportData?: Record<string, any>[];
   exportColumnNames?: string[];
   chartName?: string;
+  searchText?: string;
+  onSearchChange?: (value: string) => void;
 };
 
 export default function TableControls({
@@ -49,6 +52,8 @@ export default function TableControls({
   exportData,
   exportColumnNames,
   chartName,
+  searchText = '',
+  onSearchChange,
 }: TableControlsProps) {
   const theme = useTheme();
   const filterMap: Record<string, BinaryQueryObjectFilterClause> = useMemo(
@@ -97,8 +102,22 @@ export default function TableControls({
         css={css`
           display: flex;
           flex-wrap: wrap;
+          align-items: center;
+          gap: ${theme.sizeUnit * 2}px;
         `}
       >
+        {onSearchChange && (
+          <Input
+            prefix={<Icons.SearchOutlined iconSize="s" />}
+            placeholder={t('Search')}
+            value={searchText}
+            onChange={e => onSearchChange(e.target.value)}
+            allowClear
+            css={css`
+              width: 200px;
+            `}
+          />
+        )}
         {filterTags.map(({ colName, val }, index) => (
           <Tag
             editable

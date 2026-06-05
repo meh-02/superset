@@ -102,6 +102,7 @@ export type ChartConfiguration = {
   [chartId: number]: {
     id: number;
     crossFilters: ChartCrossFiltersConfig;
+    showCalendarFilter?: boolean;
   };
 };
 
@@ -393,5 +394,6 @@ export enum MenuKeys {
   ManageEmailReports = 'manage_email_reports',
   ExportPivotXlsx = 'export_pivot_xlsx',
   EmbedCode = 'embed_code',
-  ChartFilters = 'chart_filters'
+  ChartFilters = 'chart_filters',
+  ToggleCalendarFilter = 'toggle_calendar_filter'
 }

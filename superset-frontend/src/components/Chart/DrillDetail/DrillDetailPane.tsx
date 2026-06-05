@@ -17,6 +17,8 @@
  * under the License.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import orderBy from 'lodash/orderBy';
+import { SortByType } from '@superset-ui/core/components/TableView/types';
 import { useSelector } from 'react-redux';
 import { t } from '@apache-superset/core/translation';
 import {
@@ -36,7 +38,7 @@ import {
 } from '@superset-ui/core/components';
 import { getDatasourceSamples } from 'src/components/Chart/chartAction';
 import { RootState } from 'src/dashboard/types';
-import { useTableColumns } from 'src/explore/components/DataTableControl';
+import { useTableColumns, useFilteredTableData } from 'src/explore/components/DataTableControl';
 import { useDatasetMetadataBar } from 'src/features/datasets/metadataBar/useDatasetMetadataBar';
 import { applyFormattingToTabularData } from 'src/utils/common';
 import { Dataset } from '../types';
@@ -71,6 +73,8 @@ export default function DrillDetailPane({
   // Forces TableView to remount when filters change or reload is clicked, so
   // its internal react-table pagination state resets to initialPageIndex=0.
   const [dataSetVersion, setDataSetVersion] = useState(0);
+  const [searchText, setSearchText] = useState('');
+  const [sortBy, setSortBy] = useState<SortByType>([]);
 
   const dashboardId = useSelector<RootState, number>(
     ({ dashboardInfo }) => dashboardInfo.id,
@@ -128,6 +132,17 @@ export default function DrillDetailPane({
     allowHTML,
     dataset?.verbose_map,
   );
+
+  const filteredData = useFilteredTableData(searchText, data);
+
+  const sortedFilteredData = useMemo(() => {
+    if (!sortBy.length) return filteredData;
+    return orderBy(
+      filteredData,
+      sortBy.map((s: { id: string; desc?: boolean }) => s.id),
+      sortBy.map((s: { id: string; desc?: boolean }) => (s.desc ? 'desc' : 'asc')),
+    );
+  }, [filteredData, sortBy]);
 
   // Format temporal columns so CSV/Excel exports show dates instead of raw
   // epochs.
@@ -255,16 +270,25 @@ export default function DrillDetailPane({
       <TableView
         key={dataSetVersion}
         columns={columns}
-        data={data}
+        data={sortedFilteredData}
         pageSize={PAGE_SIZE}
         serverPagination
         totalCount={resultsPage?.total ?? 0}
         initialPageIndex={pageIndex}
-        onServerPagination={({ pageIndex: p }) => setPageIndex(p)}
+        initialSortBy={sortBy}
+        onServerPagination={({ pageIndex: p, sortBy: sb }: { pageIndex: number; sortBy?: SortByType }) => {
+          if (sb !== undefined) {
+            setSortBy(sb);
+          } else {
+            setPageIndex(p);
+          }
+        }}
         loading={isLoading}
         emptyWrapperType={EmptyWrapperType.Small}
         showRowCount={false}
         scrollTable
+        stickyHeader
+        resizable
         small
       />
     );
@@ -291,6 +315,8 @@ export default function DrillDetailPane({
           exportData={exportData}
           exportColumnNames={resultsPage?.colNames || []}
           chartName={chartName}
+          searchText={searchText}
+          onSearchChange={setSearchText}
         />
       )}
       {tableContent}

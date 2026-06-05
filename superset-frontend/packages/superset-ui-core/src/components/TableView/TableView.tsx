@@ -55,6 +55,8 @@ export interface TableViewProps {
   small?: boolean;
   columnsForWrapText?: string[];
   size?: TableSize;
+  stickyHeader?: boolean;
+  resizable?: boolean;
 }
 
 const EmptyWrapper = styled.div`
@@ -90,7 +92,10 @@ const TableViewStyles = styled.div<{
   }
 
   th[role='columnheader'] {
-    z-index: 1;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: ${({ theme }) => theme.colorBgContainer};
     border-bottom: ${({ theme }) =>
       `${theme.sizeUnit - 2}px solid ${theme.colorSplit}`};
     ${({ small }) => small && `padding-bottom: 0;`}
@@ -114,6 +119,8 @@ const RawTableView = ({
   onServerPagination = NOOP_SERVER_PAGINATION,
   scrollTopOnPagination = true,
   size = TableSize.Middle,
+  stickyHeader = false,
+  resizable = false,
   ...props
 }: TableViewProps) => {
   const tableRef = useRef<HTMLTableElement>(null);
@@ -265,6 +272,8 @@ const RawTableView = ({
         columnsForWrapText={columnsForWrapText}
         isPaginationSticky={props.isPaginationSticky}
         showRowCount={showRowCount}
+        sticky={stickyHeader}
+        resizable={resizable}
         {...paginationProps}
       />
       {isEmpty && (

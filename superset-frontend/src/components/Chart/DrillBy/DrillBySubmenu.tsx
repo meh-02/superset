@@ -51,7 +51,7 @@ import { VirtualizedMenuItem } from '../MenuItemWithTruncation';
 import { Dataset } from '../types';
 
 const SUBMENU_HEIGHT = 200;
-const SHOW_COLUMNS_SEARCH_THRESHOLD = 10;
+const SHOW_COLUMNS_SEARCH_THRESHOLD = 0;
 
 export interface DrillBySubmenuProps {
   drillByConfig?: ContextMenuFilters['drillBy'];

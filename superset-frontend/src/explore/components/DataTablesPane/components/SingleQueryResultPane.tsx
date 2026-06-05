@@ -65,7 +65,10 @@ export const SingleQueryResultPane = ({
   );
 
   return (
-    <div className="chart-data-modal-target">
+    <div
+      className="chart-data-modal-target"
+      style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+    >
       <TableControls
         data={filteredData}
         columnNames={colnames}
@@ -87,6 +90,9 @@ export const SingleQueryResultPane = ({
         className="table-condensed"
         isPaginationSticky={isPaginationSticky}
         showRowCount={false}
+        scrollTable
+        stickyHeader
+        resizable
         small
       />
     </div>

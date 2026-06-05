@@ -191,6 +191,11 @@ const SliceHeaderControls = (
   const [timeRange, setTimeRange] = useState<string>('No filter');
   const [frame, setFrame] = useState<FrameType>('No filter');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // Separate state for the calendar (time-only) filter modal
+  const [isCalendarFilterOpen, setIsCalendarFilterOpen] = useState(false);
+  const [calendarColumn, setCalendarColumn] = useState<string | null>(null);
+  const [calendarTimeRange, setCalendarTimeRange] = useState<string>('No filter');
+  const [calendarFrame, setCalendarFrame] = useState<FrameType>('No filter');
   const [openScopingModal, scopingModal] = useCrossFiltersScopingModal(
     props.slice.slice_id,
   );
@@ -239,26 +244,26 @@ const SliceHeaderControls = (
       ? datasetResource.result
       : undefined;
 
-  const columnOptions = Object.keys(
-  datasetWithVerboseMap?.verbose_map || {}
-).map(col => ({
-  label: datasetWithVerboseMap?.verbose_map?.[col] || col,
-  value: col,
-}));
-
-  // Auto-detect temporal columns from the chart's own dataset metadata.
-  // The Chart Filters modal swaps Operator+Value for the Explore-style
-  // time-range picker whenever the picked column has is_dttm === true.
+  // Temporal columns must be defined first so columnOptions can exclude them.
   const temporalColumns = new Set(
     (datasetWithVerboseMap?.columns || [])
       .filter((c: any) => c?.is_dttm)
       .map((c: any) => c.column_name),
   );
+
+  // Exclude temporal columns — time filtering is handled by the calendar icon.
+  const columnOptions = Object.keys(
+    datasetWithVerboseMap?.verbose_map || {}
+  )
+    .filter(col => !temporalColumns.has(col))
+    .map(col => ({
+      label: datasetWithVerboseMap?.verbose_map?.[col] || col,
+      value: col,
+    }));
+
   const isTemporal = selectedColumn
     ? temporalColumns.has(selectedColumn)
     : false;
-
-  console.log("column options :", columnOptions);
 
   const refreshChart = () => {
     if (props.updatedDttm) {
@@ -368,7 +373,12 @@ const SliceHeaderControls = (
         break;
       }
       case MenuKeys.ChartFilters: {
-	setIsFilterModalOpen(true);
+        setIsFilterModalOpen(true);
+        break;
+      }
+      case MenuKeys.ToggleCalendarFilter: {
+        setCalendarColumn([...temporalColumns][0]);
+        setIsCalendarFilterOpen(true);
         break;
       }
       default:
@@ -458,7 +468,16 @@ const SliceHeaderControls = (
       type: 'item',
       key: MenuKeys.ChartFilters,
       label: t('Filters'),
-    }, 
+    },
+    ...(temporalColumns.size > 0
+      ? [
+          {
+            type: 'item',
+            key: MenuKeys.ToggleCalendarFilter,
+            label: t('Calendar filter'),
+          },
+        ]
+      : []),
     {
       type: 'divider',
     },
@@ -668,6 +687,33 @@ const SliceHeaderControls = (
     setIsFilterModalOpen(false);
   };
 
+  // Clears only the temporal (TEMPORAL_RANGE) filter — leaves column filters untouched
+  const handleClearCalendarFilter = () => {
+    const formData = chart?.latestQueryFormData || props.formData;
+    const filtered = (formData.adhoc_filters || []).filter(
+      (f: any) => !(f.operator === 'TEMPORAL_RANGE'),
+    );
+    const updatedFormData = {
+      ...formData,
+      adhoc_filters: filtered,
+      time_range: originalTimeRangeRef.current,
+    };
+    dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
+    dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
+    dispatch(
+      postChartFormData(
+        updatedFormData,
+        true,
+        undefined,
+        props.slice.slice_id,
+        props.dashboardId,
+      ),
+    );
+    setCalendarTimeRange('No filter');
+    setCalendarFrame('No filter');
+    setIsCalendarFilterOpen(false);
+  };
+
   const applyFilterToChart = (newFilter: any) => {
 	const existingFilters = props.formData.adhoc_filters || [];
 
@@ -713,6 +759,30 @@ const SliceHeaderControls = (
           }}
         />
       )}
+      {/* Separate calendar icon button — commented out; calendar filter is now in the 3-dot menu
+      {temporalColumns.size > 0 && (
+        <Tooltip title={t('Time filter')}>
+          <Button
+            buttonStyle="link"
+            aria-label={t('Time filter')}
+            onClick={() => {
+              setCalendarColumn([...temporalColumns][0]);
+              setCalendarTimeRange('No filter');
+              setCalendarFrame('No filter');
+              setIsCalendarFilterOpen(true);
+            }}
+            css={(theme: any) => css`
+              padding: ${theme.sizeUnit * 2}px;
+            `}
+          >
+            <Icons.CalendarOutlined
+              iconSize="xl"
+              iconColor={theme.colorTextLabel}
+            />
+          </Button>
+        </Tooltip>
+      )}
+      */}
       <NoAnimationDropdown
         popupRender={() => (
           <Menu
@@ -1023,6 +1093,110 @@ if (!selectedColumn || !operator || isEmptyValue) {
     </div>
   )}
 </Modal>
+
+      {/* ── Calendar (time-only) filter modal ── */}
+      <Modal
+        title={
+          <div>
+            <div style={{ fontWeight: 600 }}>{t('Calendar Filter')}</div>
+            <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.7, marginTop: 2 }}>
+              {slice.slice_name}
+            </div>
+          </div>
+        }
+        width={520}
+        centered
+        open={isCalendarFilterOpen}
+        onOk={() => {
+          if (!calendarColumn || !calendarTimeRange || calendarTimeRange === 'No filter') {
+            props.addDangerToast(t('Please pick a time range'));
+            return;
+          }
+          const formData = chart?.latestQueryFormData || props.formData;
+          const filtered = (formData.adhoc_filters || []).filter(
+            (f: any) => !(f.subject === calendarColumn),
+          );
+          const newFilter: BinaryAdhocFilter = {
+            clause: 'WHERE',
+            subject: calendarColumn!,
+            operator: 'TEMPORAL_RANGE' as any,
+            comparator: calendarTimeRange,
+            expressionType: 'SIMPLE',
+          };
+          const updatedFormData = {
+            ...formData,
+            adhoc_filters: [...filtered, newFilter],
+            time_range: calendarTimeRange,
+          };
+          dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
+          dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
+          dispatch(
+            postChartFormData(
+              updatedFormData,
+              true,
+              undefined,
+              props.slice.slice_id,
+              props.dashboardId,
+            ),
+          );
+          setIsCalendarFilterOpen(false);
+        }}
+        onCancel={() => setIsCalendarFilterOpen(false)}
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <Button buttonStyle="link" buttonSize="small" onClick={handleClearCalendarFilter}>
+            {t('Clear')}
+          </Button>
+        </div>
+
+        {/* Show column picker only when there are multiple temporal columns */}
+        {temporalColumns.size > 1 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 4, fontWeight: 500 }}>{t('Column')}</div>
+            <Select
+              style={{ width: '100%' }}
+              value={calendarColumn || undefined}
+              onChange={(val: string) => setCalendarColumn(val)}
+              options={[...temporalColumns].map(col => ({
+                label: datasetWithVerboseMap?.verbose_map?.[col] || col,
+                value: col,
+              }))}
+            />
+          </div>
+        )}
+
+        {/* Time range picker */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 4, fontWeight: 500 }}>{t('Select Time range')}</div>
+          <div style={{ marginBottom: 12 }}>
+            <Select
+              style={{ width: '100%' }}
+              options={FRAME_OPTIONS}
+              value={calendarFrame}
+              onChange={(val: FrameType) => {
+                setCalendarFrame(val);
+                if (val === 'No filter') setCalendarTimeRange('No filter');
+              }}
+            />
+          </div>
+          {calendarFrame === 'Common' && (
+            <CommonFrame value={calendarTimeRange} onChange={setCalendarTimeRange} />
+          )}
+          {calendarFrame === 'Calendar' && (
+            <CalendarFrame value={calendarTimeRange} onChange={setCalendarTimeRange} />
+          )}
+          {calendarFrame === 'Current' && (
+            <CurrentCalendarFrame value={calendarTimeRange} onChange={setCalendarTimeRange} />
+          )}
+          {calendarFrame === 'Advanced' && (
+            <AdvancedFrame value={calendarTimeRange} onChange={setCalendarTimeRange} />
+          )}
+          {calendarFrame === 'Custom' && (
+            <CustomFrame value={calendarTimeRange} onChange={setCalendarTimeRange} />
+          )}
+        </div>
+      </Modal>
+
       <DrillDetailModal
         formData={props.formData}
         initialFilters={[]}

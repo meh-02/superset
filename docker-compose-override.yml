@@ -1,0 +1,20 @@
+services:
+  db:
+    ports: !reset []
+
+  superset-node:
+    volumes:
+      - node_modules:/app/superset-frontend/node_modules
+      - pkg_generator_node_modules:/app/superset-frontend/packages/generator-superset/node_modules
+      - pkg_superset_core_node_modules:/app/superset-frontend/packages/superset-core/node_modules
+      - pkg_ui_chart_controls_node_modules:/app/superset-frontend/packages/superset-ui-chart-controls/node_modules
+      - pkg_ui_core_node_modules:/app/superset-frontend/packages/superset-ui-core/node_modules
+      - pkg_ui_switchboard_node_modules:/app/superset-frontend/packages/superset-ui-switchboard/node_modules
+
+volumes:
+  node_modules:
+  pkg_generator_node_modules:
+  pkg_superset_core_node_modules:
+  pkg_ui_chart_controls_node_modules:
+  pkg_ui_core_node_modules:
+  pkg_ui_switchboard_node_modules:

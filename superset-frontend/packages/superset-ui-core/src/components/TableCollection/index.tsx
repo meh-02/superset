@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { HTMLAttributes, memo, useMemo, useCallback } from 'react';
+import React, { HTMLAttributes, memo, useMemo, useCallback, useState } from 'react';
+import { Resizable } from 'react-resizable';
 import {
   ColumnInstance,
   HeaderGroup,
@@ -29,6 +30,34 @@ import { styled } from '@apache-superset/core/theme';
 import { Table, TableSize } from '@superset-ui/core/components/Table';
 import { TableRowSelection, SorterResult } from 'antd/es/table/interface';
 import { mapColumns, mapRows } from './utils';
+
+const ResizableTitle = ({
+  onResize,
+  width,
+  ...restProps
+}: {
+  onResize?: (e: React.SyntheticEvent, data: { size: { width: number; height: number } }) => void;
+  width?: number;
+  [key: string]: any;
+}) => {
+  if (!width || !onResize) return <th {...restProps} />;
+  return (
+    <Resizable
+      width={width}
+      height={0}
+      handle={
+        <span
+          className="react-resizable-handle"
+          onClick={e => e.stopPropagation()}
+        />
+      }
+      onResize={onResize}
+      draggableOpts={{ enableUserSelectHack: false }}
+    >
+      <th {...restProps} />
+    </Resizable>
+  );
+};
 
 interface TableCollectionProps<T extends object> {
   getTableProps: TablePropGetter<T>;
@@ -53,6 +82,7 @@ interface TableCollectionProps<T extends object> {
   onPageChange?: (page: number, pageSize: number) => void;
   isPaginationSticky?: boolean;
   showRowCount?: boolean;
+  resizable?: boolean;
 }
 
 const StyledTable = styled(Table)<{
@@ -153,6 +183,30 @@ const StyledTable = styled(Table)<{
     & table {
       background-color: ${theme.colorBgContainer};
     }
+
+    .react-resizable {
+      position: relative;
+      background-clip: padding-box;
+    }
+
+    .react-resizable-handle {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      &::after {
+        content: '';
+        position: absolute;
+        right: 3px;
+        top: 20%;
+        height: 60%;
+        width: 1px;
+        background-color: ${theme.colorSplit};
+      }
+    }
   `}
 `;
 
@@ -177,7 +231,18 @@ function TableCollection<T extends object>({
   onPageChange,
   isPaginationSticky = false,
   showRowCount = true,
+  resizable = false,
 }: TableCollectionProps<T>) {
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+
+  const handleResize = useCallback(
+    (key: string) =>
+      (_e: React.SyntheticEvent, { size }: { size: { width: number; height: number } }) => {
+        setColWidths(prev => ({ ...prev, [key]: size.width }));
+      },
+    [],
+  );
+
   const mappedColumns = useMemo(
     () => mapColumns<T>(columns, headerGroups, columnsForWrapText),
     [columns, headerGroups, columnsForWrapText],
@@ -286,17 +351,31 @@ function TableCollection<T extends object>({
     [highlightRowId],
   );
 
+  const resizableMappedColumns = useMemo(() => {
+    if (!resizable) return mappedColumns;
+    return mappedColumns.map((col: any) => ({
+      ...col,
+      width: colWidths[col.key] ?? col.width ?? 150,
+      onHeaderCell: (column: any) => ({
+        width: column.width,
+        onResize: handleResize(col.key),
+        'data-test': 'sort-header',
+        role: 'columnheader',
+      }),
+    }));
+  }, [resizable, mappedColumns, colWidths, handleResize]);
+
   return (
     <StyledTable
       loading={loading}
       sticky={sticky ?? false}
-      columns={mappedColumns}
+      columns={resizableMappedColumns}
       data={mappedRows}
       size={size}
       data-test="listview-table"
       pagination={paginationConfig}
       scroll={{ x: 'max-content' }}
-      tableLayout="auto"
+      tableLayout={resizable ? 'fixed' : 'auto'}
       rowKey="rowId"
       rowSelection={rowSelection}
       locale={{ emptyText: null }}
@@ -306,9 +385,11 @@ function TableCollection<T extends object>({
       rowClassName={getRowClassName}
       components={{
         header: {
-          cell: (props: HTMLAttributes<HTMLTableCellElement>) => (
-            <th {...props} data-test="sort-header" role="columnheader" />
-          ),
+          cell: resizable
+            ? ResizableTitle
+            : (props: HTMLAttributes<HTMLTableCellElement>) => (
+                <th {...props} data-test="sort-header" role="columnheader" />
+              ),
         },
         body: {
           row: (props: HTMLAttributes<HTMLTableRowElement>) => (
