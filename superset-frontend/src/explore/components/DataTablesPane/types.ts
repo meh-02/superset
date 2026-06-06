@@ -76,6 +76,7 @@ export interface TableControlsProps {
   rowcount: number;
   canDownload: boolean;
   chartName?: string;
+  columnDisplayNames?: Record<string, string>;
 }
 
 export interface QueryResultInterface {

@@ -79,6 +79,7 @@ export const SingleQueryResultPane = ({
         isLoading={false}
         canDownload={canDownload}
         chartName={chartName}
+        columnDisplayNames={columnDisplayNames}
       />
       <TableView
         columns={columns}

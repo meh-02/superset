@@ -96,6 +96,12 @@ const StyledTable = styled(Table)<{
       white-space: nowrap;
     }
 
+    .ant-table-thead > tr > th {
+      text-transform: uppercase;
+      font-size: ${theme.fontSizeSM}px;
+      letter-spacing: 0.5px;
+    }
+
     .actions {
       opacity: 0;
       font-size: ${theme.fontSizeXL}px;

@@ -48,7 +48,6 @@ import {
   Button,
   ModalTrigger,
 } from '@superset-ui/core/components';
-import { useShareMenuItems } from 'src/dashboard/components/menu/ShareMenuItems';
 import downloadAsImage from 'src/utils/downloadAsImage';
 import { getSliceHeaderTooltip } from 'src/dashboard/util/getSliceHeaderTooltip';
 import { Icons } from '@superset-ui/core/components/Icons';
@@ -388,16 +387,11 @@ const SliceHeaderControls = (
   };
 
   const {
-    componentId,
-    dashboardId,
     slice,
     isFullSize,
     cachedDttm = [],
     queriedDttm = null,
     updatedDttm = null,
-    addSuccessToast = () => {},
-    addDangerToast = () => {},
-    supersetCanShare = false,
     isCached = [],
   } = props;
   const isTable = slice.viz_type === VizType.Table;
@@ -577,19 +571,6 @@ const SliceHeaderControls = (
     key: MenuKeys.DrillToDetail,
   });
 
-  const shareMenuItems = useShareMenuItems({
-    dashboardId,
-    dashboardComponentId: componentId,
-    copyMenuItemTitle: t('Copy permalink to clipboard'),
-    emailMenuItemTitle: t('Share chart by email'),
-    emailSubject: t('Superset chart'),
-    emailBody: t('Check out this chart: '),
-    addSuccessToast,
-    addDangerToast,
-    title: t('Share'),
-    latestQueryFormData: props.formData,
-    maxWidth: `${theme.sizeUnit * 100}px`,
-  });
 
   if (isFeatureEnabled(FeatureFlag.DrillToDetail) && canDrillToDetail) {
     newMenuItems.push(...drillDetailMenuItems);
@@ -599,9 +580,6 @@ const SliceHeaderControls = (
     newMenuItems.push({ type: 'divider' });
   }
 
-  if (supersetCanShare) {
-    newMenuItems.push(shareMenuItems);
-  }
 
   if (props.supersetCanCSV) {
     newMenuItems.push({

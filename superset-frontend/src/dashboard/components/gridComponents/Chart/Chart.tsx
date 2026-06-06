@@ -25,6 +25,9 @@ import { debounce } from 'lodash';
 import { bindActionCreators } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { utils, writeFile } from 'xlsx';
+import { GenericDataType } from '@apache-superset/core/common';
+import { applyFormattingToTabularData } from 'src/utils/common';
 import { exportChart } from 'src/explore/exploreUtils';
 import ChartContainer from 'src/components/Chart/ChartContainer';
 import LastQueriedLabel from 'src/components/LastQueriedLabel';
@@ -583,9 +586,51 @@ console.log('latestQueryFormData', chart?.latestQueryFormData);
     ],
   );
 
+  const exportClientSide = useCallback(
+    (format: 'csv' | 'xlsx') => {
+      const queryResult = queriesResponse?.[0] as JsonObject | undefined;
+      if (!queryResult) return;
+
+      const colnames = (queryResult.colnames as string[]) ?? [];
+      const coltypes = (queryResult.coltypes as GenericDataType[]) ?? [];
+      const rawData = (queryResult.data as Record<string, any>[]) ?? [];
+
+      const temporalCols = colnames.filter(
+        (_, idx) => coltypes[idx] === GenericDataType.Temporal,
+      );
+      const formattedData = applyFormattingToTabularData(rawData, temporalCols);
+
+      const verboseMap = datasource?.verbose_map as
+        | Record<string, string>
+        | undefined;
+      const displayNames = colnames.map(k =>
+        (verboseMap?.[k] ?? k).replace(/_/g, ' ').toUpperCase(),
+      );
+
+      const exportRows = formattedData.map(row =>
+        Object.fromEntries(colnames.map((k, i) => [displayNames[i], row[k]])),
+      );
+
+      const sheet = utils.json_to_sheet(exportRows, { header: displayNames });
+      const book = utils.book_new();
+      utils.book_append_sheet(book, sheet, 'Data');
+
+      const safeName = (sliceSliceName || 'chart-data')
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .trim() || 'chart-data';
+
+      writeFile(
+        book,
+        `${safeName}.${format}`,
+        format === 'csv' ? { bookType: 'csv' } : undefined,
+      );
+    },
+    [queriesResponse, datasource, sliceSliceName],
+  );
+
   const exportCSV = useCallback(() => {
-    exportTable('csv', false);
-  }, [exportTable]);
+    exportClientSide('csv');
+  }, [exportClientSide]);
 
   const exportFullCSV = useCallback(() => {
     exportTable('csv', true);
@@ -596,8 +641,8 @@ console.log('latestQueryFormData', chart?.latestQueryFormData);
   }, [exportTable]);
 
   const exportXLSX = useCallback(() => {
-    exportTable('xlsx', false);
-  }, [exportTable]);
+    exportClientSide('xlsx');
+  }, [exportClientSide]);
 
   const exportFullXLSX = useCallback(() => {
     exportTable('xlsx', true);

@@ -19,7 +19,7 @@
 import { memo, useEffect, useRef, useMemo, useCallback } from 'react';
 import { isEqual } from 'lodash';
 import { styled } from '@apache-superset/core/theme';
-import { useFilters, usePagination, useSortBy, useTable } from 'react-table';
+import { useFilters, usePagination, useSortBy, useTable, SortingRule } from 'react-table';
 import { Empty } from '@superset-ui/core/components';
 import TableCollection from '@superset-ui/core/components/TableCollection';
 import { TableSize } from '@superset-ui/core/components/Table';
@@ -248,14 +248,19 @@ const RawTableView = ({
     }
   }, [initialState.pageIndex, onServerPagination, pageIndex, serverPagination]);
 
-  useEffect(() => {
-    if (serverPagination && !isEqual(sortBy, initialState.sortBy)) {
-      onServerPagination({
-        pageIndex: 0,
-        sortBy,
-      });
-    }
-  }, [initialState.sortBy, onServerPagination, serverPagination, sortBy]);
+  // For server-side pagination, wrap setSortBy so that both react-table's
+  // internal sort state AND the parent's sort state update in the same React
+  // render cycle (React 18 batches synchronous setState calls). This prevents
+  // the one-render delay that makes the first sort click look like it did nothing.
+  const setSortByWithNotify = useCallback(
+    (updater: SortingRule<any>[]) => {
+      setSortBy(updater);
+      if (serverPagination) {
+        onServerPagination({ pageIndex: 0, sortBy: updater });
+      }
+    },
+    [setSortBy, serverPagination, onServerPagination],
+  );
 
   return (
     <TableViewStyles {...props} ref={tableRef}>
@@ -267,7 +272,7 @@ const RawTableView = ({
         rows={content}
         columns={columns}
         loading={loading}
-        setSortBy={setSortBy}
+        setSortBy={setSortByWithNotify}
         size={size}
         columnsForWrapText={columnsForWrapText}
         isPaginationSticky={props.isPaginationSticky}

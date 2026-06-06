@@ -154,6 +154,40 @@ export default function DrillDetailPane({
     return applyFormattingToTabularData(data, temporalCols);
   }, [data, resultsPage]);
 
+  // Compute display labels (verbose_map → replace _ → UPPERCASE) for export headers
+  const exportDisplayColumnNames = useMemo(
+    () =>
+      (resultsPage?.colNames ?? []).map(k =>
+        (dataset?.verbose_map?.[k] ?? k).replace(/_/g, ' ').toUpperCase(),
+      ),
+    [resultsPage?.colNames, dataset?.verbose_map],
+  );
+
+  // Remap export data keys to display labels so downloaded files show proper headers
+  const exportDataWithDisplayNames = useMemo(
+    () =>
+      exportData.map(row =>
+        Object.fromEntries(
+          (resultsPage?.colNames ?? []).map((k, i) => [
+            exportDisplayColumnNames[i],
+            row[k],
+          ]),
+        ),
+      ),
+    [exportData, resultsPage?.colNames, exportDisplayColumnNames],
+  );
+
+  const handleServerPagination = useCallback(
+    ({ pageIndex: p, sortBy: sb }: { pageIndex: number; sortBy?: SortByType }) => {
+      if (sb !== undefined) {
+        setSortBy(sb);
+      } else {
+        setPageIndex(p);
+      }
+    },
+    [],
+  );
+
   // Clear cache on reload button click
   const handleReload = useCallback(() => {
     setResponseError('');
@@ -276,13 +310,7 @@ export default function DrillDetailPane({
         totalCount={resultsPage?.total ?? 0}
         initialPageIndex={pageIndex}
         initialSortBy={sortBy}
-        onServerPagination={({ pageIndex: p, sortBy: sb }: { pageIndex: number; sortBy?: SortByType }) => {
-          if (sb !== undefined) {
-            setSortBy(sb);
-          } else {
-            setPageIndex(p);
-          }
-        }}
+        onServerPagination={handleServerPagination}
         loading={isLoading}
         emptyWrapperType={EmptyWrapperType.Small}
         showRowCount={false}
@@ -312,8 +340,8 @@ export default function DrillDetailPane({
           totalCount={resultsPage?.total}
           loading={isLoading}
           onReload={handleReload}
-          exportData={exportData}
-          exportColumnNames={resultsPage?.colNames || []}
+          exportData={exportDataWithDisplayNames}
+          exportColumnNames={exportDisplayColumnNames}
           chartName={chartName}
           searchText={searchText}
           onSearchChange={setSearchText}

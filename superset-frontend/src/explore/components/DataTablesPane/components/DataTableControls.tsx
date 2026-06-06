@@ -53,6 +53,7 @@ export const TableControls = ({
   isLoading,
   canDownload,
   chartName,
+  columnDisplayNames,
 }: TableControlsProps) => {
   const originalTimeColumns = getTimeColumns(datasourceId);
   const formattedTimeColumns = zip<string, GenericDataType>(
@@ -71,6 +72,23 @@ export const TableControls = ({
     () => applyFormattingToTabularData(data, formattedTimeColumns),
     [data, formattedTimeColumns],
   );
+
+  const displayColumnNames = useMemo(
+    () =>
+      columnNames.map(k =>
+        (columnDisplayNames?.[k] ?? k).replace(/_/g, ' ').toUpperCase(),
+      ),
+    [columnNames, columnDisplayNames],
+  );
+
+  const exportData = useMemo(
+    () =>
+      formattedData.map(row =>
+        Object.fromEntries(columnNames.map((k, i) => [displayColumnNames[i], row[k]])),
+      ),
+    [formattedData, columnNames, displayColumnNames],
+  );
+
   return (
     <TableControlsWrapper>
       <FilterInput onChangeHandler={onInputChange} shouldFocus />
@@ -83,10 +101,10 @@ export const TableControls = ({
         <RowCountLabel rowcount={rowcount} loading={isLoading} />
         {canDownload && (
           <>
-            <CopyToClipboardButton data={formattedData} columns={columnNames} />
+            <CopyToClipboardButton data={exportData} columns={displayColumnNames} />
             <ModalDownloadDropdown
-              data={formattedData}
-              columnNames={columnNames}
+              data={exportData}
+              columnNames={displayColumnNames}
               fileName={chartName || 'chart-data'}
               imageTargetSelector=".chart-data-modal-target"
             />

@@ -308,7 +308,8 @@ export const useTableColumns = (
             .map((key, index) => {
               const colType = coltypes?.[index];
               const firstValue = data[0][key];
-              const headerLabel = columnDisplayNames?.[key] ?? key;
+              const rawLabel = columnDisplayNames?.[key] ?? key;
+              const headerLabel = rawLabel.replace(/_/g, ' ');
               const originalFormattedTimeColumnIndex =
                 colType === GenericDataType.Temporal
                   ? originalFormattedTimeColumns.indexOf(key)
