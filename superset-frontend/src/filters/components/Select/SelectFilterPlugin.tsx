@@ -611,28 +611,31 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
               ref={inputRef}
             />
           ) : (
+              (() => {
+                const valArr = ensureIsArray(filterState.value);
+                const isFullyLocked =
+                  lockedValues.length > 0 &&
+                  valArr.length > 0 &&
+                  valArr.every(v =>
+                    lockedValues.includes(v as string | number),
+                  );
+                return (
               <Select
               name={formData.nativeFilterId}
-              allowClear={(() => {
-                const valArr = ensureIsArray(filterState.value);
-                if (lockedValues.length === 0) return true;
-                if (valArr.length === 0) return true;
-                const allLocked = valArr.every(v =>
-                  lockedValues.includes(v as string | number),
-                );
-                return !allLocked;
-              })()}
-              allowNewOptions={!searchAllOptions && creatable !== false}
-              allowSelectAll={!searchAllOptions}
+              allowClear={!isFullyLocked}
+              allowNewOptions={!isFullyLocked && !searchAllOptions && creatable !== false}
+              allowSelectAll={!isFullyLocked && !searchAllOptions}
               value={multiSelect ? filterState.value || [] : filterState.value}
               disabled={isDisabled}
+              open={isFullyLocked ? false : undefined}
+              showArrow={!isFullyLocked}
               getPopupContainer={
                 showOverflow
                   ? () => (parentRef?.current as HTMLElement) || document.body
                   : (trigger: HTMLElement) =>
                       (trigger?.parentNode as HTMLElement) || document.body
               }
-              showSearch={showSearch}
+              showSearch={!isFullyLocked && showSearch}
               mode={multiSelect ? 'multiple' : 'single'}
               placeholder={placeholderText}
               onClear={() => onSearch('')}
@@ -676,6 +679,8 @@ export default function PluginFilterSelect(props: PluginFilterSelectProps) {
                 );
               }}
             />
+                );
+              })()
           )}
         </StyledSpace>
       </FormItem>
