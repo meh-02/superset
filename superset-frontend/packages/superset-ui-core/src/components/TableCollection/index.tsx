@@ -374,13 +374,18 @@ function TableCollection<T extends object>({
   return (
     <StyledTable
       loading={loading}
-      sticky={sticky ?? false}
+      // Ant's `sticky` clones the header into a second table whose <colgroup>
+      // desyncs from the body during resize — use the CSS sticky rule in
+      // TableView instead so a single <table> holds both header and body.
+      sticky={false}
       columns={resizableMappedColumns}
       data={mappedRows}
       size={size}
       data-test="listview-table"
       pagination={paginationConfig}
-      scroll={{ x: 'max-content' }}
+      // Skip Ant's inner scroll container when sticky is on so the outer
+      // TableView wrapper is the sole scroll ancestor for the `<th>` sticky.
+      scroll={sticky ? undefined : { x: 'max-content' }}
       tableLayout={resizable ? 'fixed' : 'auto'}
       rowKey="rowId"
       rowSelection={rowSelection}

@@ -220,20 +220,62 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
     const showRowLimitWarning =
       shouldShowRowLimitWarning && sqlRowCount >= rowLimit && rowLimit > 0;
 
+    // Build a dynamic suffix from filters applied via the 3-dot "Filters"
+    // modal (stored on formData.ui_chart_filters). Example output:
+    //   "Top 10 Transformer Tripping's in Circle - TS Karnal".
+    const uiChartFilters = !editMode
+      ? (((formData as any)?.ui_chart_filters || []) as any[])
+      : [];
+
+    const formatFilterValue = (val: any): string => {
+      if (Array.isArray(val)) return val.join(', ');
+      if (val === null || val === undefined) return '';
+      return String(val);
+    };
+
+    const prettifyLabel = (raw: string): string =>
+      raw
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ')
+        .map(w => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+        .join(' ');
+
+    const filterSuffix = uiChartFilters.length
+      ? ` in ${uiChartFilters
+          .map((f: any) => {
+            const rawLabel = f?.subjectLabel || f?.subject || '';
+            const label = prettifyLabel(rawLabel);
+            const op = f?.operator;
+            const valueStr = formatFilterValue(f?.comparator);
+            if (op === '==' || op === 'TEMPORAL_RANGE' || op === 'IN') {
+              return `${label} - ${valueStr}`;
+            }
+            return `${label} ${op} ${valueStr}`;
+          })
+          .filter(Boolean)
+          .join(', ')}`
+      : '';
+
+    const displayTitle = `${sliceName || ''}${filterSuffix}`;
+
     useEffect(() => {
       const headerElement = headerRef.current;
       if (canExplore) {
-        setHeaderTooltip(getSliceHeaderTooltip(sliceName));
+        setHeaderTooltip(getSliceHeaderTooltip(displayTitle));
       } else if (
         headerElement &&
         (headerElement.scrollWidth > headerElement.offsetWidth ||
           headerElement.scrollHeight > headerElement.offsetHeight)
       ) {
-        setHeaderTooltip(sliceName ?? null);
+        setHeaderTooltip(displayTitle ?? null);
+      } else if (filterSuffix) {
+        setHeaderTooltip(displayTitle);
       } else {
         setHeaderTooltip(null);
       }
-    }, [sliceName, width, height, canExplore]);
+    }, [displayTitle, filterSuffix, width, height, canExplore]);
 
     const exploreUrl = `/explore/?dashboard_page_id=${dashboardPageId}&slice_id=${slice.slice_id}`;
 
@@ -261,10 +303,9 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
             <div>
               <EditableTitle
                 title={
-                  sliceName ||
-                  (editMode
-                    ? '---' // this makes an empty title clickable
-                    : '')
+                  editMode
+                    ? sliceName || '---' // this makes an empty title clickable
+                    : displayTitle || ''
                 }
                 canEdit={editMode}
                 onSaveTitle={updateSliceName}

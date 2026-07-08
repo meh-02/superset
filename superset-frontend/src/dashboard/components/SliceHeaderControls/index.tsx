@@ -463,7 +463,8 @@ const SliceHeaderControls = (
       key: MenuKeys.ChartFilters,
       label: t('Filters'),
     },
-    ...(temporalColumns.size > 0
+    ...(temporalColumns.size > 0 &&
+    (props.formData as any).show_calendar_filter_in_menu !== false
       ? [
           {
             type: 'item',
@@ -642,6 +643,7 @@ const SliceHeaderControls = (
       ...baseFormData,
       adhoc_filters: originalAdhocFiltersRef.current,
       time_range: originalTimeRangeRef.current,
+      ui_chart_filters: [],
     };
     // Mirror the dispatch pattern used in onOk so the chart actually
     // re-renders to its original filters (not just the next fetch).
@@ -675,6 +677,9 @@ const SliceHeaderControls = (
       ...formData,
       adhoc_filters: filtered,
       time_range: originalTimeRangeRef.current,
+      ui_chart_filters: (
+        ((formData as any).ui_chart_filters || []) as any[]
+      ).filter((f: any) => f.operator !== 'TEMPORAL_RANGE'),
     };
     dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
     dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));
@@ -831,6 +836,12 @@ const SliceHeaderControls = (
         comparator: timeRange,
         expressionType: 'SIMPLE',
       };
+      const temporalSubjectLabel =
+        datasetWithVerboseMap?.verbose_map?.[selectedColumn!] || selectedColumn!;
+      const temporalUiFilter = {
+        ...newFilter,
+        subjectLabel: temporalSubjectLabel,
+      };
       // Also set the chart's time_range to the same value. Superset's
       // backend builds the WHERE clause for temporal columns from the
       // (from_dttm, to_dttm) bounds derived from time_range — leaving
@@ -841,6 +852,12 @@ const SliceHeaderControls = (
         ...formData,
         adhoc_filters: [...filtered, newFilter],
         time_range: timeRange,
+        ui_chart_filters: [
+          ...(((formData as any).ui_chart_filters || []) as any[]).filter(
+            (f: any) => f.subject !== selectedColumn,
+          ),
+          temporalUiFilter,
+        ],
       };
       // Persist the override on the chart's form_data so the dashboard
       // Chart container re-renders with the new filter (it reads from
@@ -895,9 +912,22 @@ if (!selectedColumn || !operator || isEmptyValue) {
    // filterOptionName: `filter_${Date.now()}`,
   };
 
+  const subjectLabel =
+    datasetWithVerboseMap?.verbose_map?.[selectedColumn!] || selectedColumn!;
+  const newUiFilter = {
+    ...newFilter,
+    subjectLabel,
+  };
+
   const updatedFormData = {
     ...formData,
     adhoc_filters: [...filtered, newFilter],
+    ui_chart_filters: [
+      ...(((formData as any).ui_chart_filters || []) as any[]).filter(
+        (f: any) => f.subject !== selectedColumn,
+      ),
+      newUiFilter,
+    ],
   };
   
   // Persist on chart.form_data so the dashboard Chart container re-renders
@@ -1101,10 +1131,23 @@ if (!selectedColumn || !operator || isEmptyValue) {
             comparator: calendarTimeRange,
             expressionType: 'SIMPLE',
           };
+          const calendarSubjectLabel =
+            datasetWithVerboseMap?.verbose_map?.[calendarColumn!] ||
+            calendarColumn!;
+          const calendarUiFilter = {
+            ...newFilter,
+            subjectLabel: calendarSubjectLabel,
+          };
           const updatedFormData = {
             ...formData,
             adhoc_filters: [...filtered, newFilter],
             time_range: calendarTimeRange,
+            ui_chart_filters: [
+              ...(
+                ((formData as any).ui_chart_filters || []) as any[]
+              ).filter((f: any) => f.subject !== calendarColumn),
+              calendarUiFilter,
+            ],
           };
           dispatch(updateChartFormData(updatedFormData, props.slice.slice_id));
           dispatch(updateQueryFormData(updatedFormData, props.slice.slice_id));

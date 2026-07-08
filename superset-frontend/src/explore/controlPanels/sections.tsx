@@ -332,6 +332,28 @@ export const matrixifyEnableSection: ControlPanelSectionConfig = {
   ],
 };
 
+export const chartMenuOptions: ControlPanelSectionConfig = {
+  label: t('Menu Options'),
+  tabOverride: 'customize',
+  expanded: false,
+  controlSetRows: [
+    [
+      {
+        name: 'show_calendar_filter_in_menu',
+        config: {
+          type: 'CheckboxControl',
+          label: t('Show calendar filter in menu'),
+          default: true,
+          renderTrigger: true,
+          description: t(
+            "Show the \"Calendar filter\" option in this chart's 3-dot dropdown menu on dashboards. Only applies when the dataset has a temporal column.",
+          ),
+        },
+      },
+    ],
+  ],
+};
+
 export const matrixifyCells: ControlPanelSectionConfig = {
   label: t('Cell layout & styling'),
   expanded: true,

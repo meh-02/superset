@@ -104,8 +104,17 @@ class CeleryConfig:
 
 
 CELERY_CONFIG = CeleryConfig
-
-FEATURE_FLAGS = {"ALERT_REPORTS": True, "DATASET_FOLDERS": True}
+ENABLE_CORS = True
+CORS_OPTIONS = {
+    "origins": ["http://localhost:5001", "http://10.11.0.1:5001"]
+}
+TALISMAN_CONFIG = {
+    "content_security_policy": {
+        "frame-ancestors": ["'self'", "http://localhost:5001", "http://10.11.0.1:5001"]
+    }
+}
+FEATURE_FLAGS = {"ALERT_REPORTS": True, "DATASET_FOLDERS": True,     "EMBEDDABLE_CHARTS": True,
+    "EMBEDDED_SUPERSET": True,}
 ALERT_REPORTS_NOTIFICATION_DRY_RUN = True
 WEBDRIVER_BASEURL = f"http://superset_app{os.environ.get('SUPERSET_APP_ROOT', '/')}/"  # When using docker compose baseurl should be http://superset_nginx{ENV{BASEPATH}}/  # noqa: E501
 # The base URL for the email report hyperlinks.

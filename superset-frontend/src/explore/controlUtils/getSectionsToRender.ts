@@ -64,6 +64,7 @@ const getMemoizedSectionsToRender = memoizeOne(
       matrixifyColumns = null,
       matrixifyCells = null,
       matrixifyEnableSection = null,
+      chartMenuOptions = null,
     } = sections;
 
     // list of datasource-specific controls that should be removed if the datasource is a specific type
@@ -81,6 +82,9 @@ const getMemoizedSectionsToRender = memoizeOne(
     ]
       .filter(Boolean) // Filter out null/undefined sections
       .concat(controlPanelSections.filter(isControlPanelSectionConfig))
+      .concat(
+        chartMenuOptions ? [chartMenuOptions as ControlPanelSectionConfig] : [],
+      )
       .map(section => {
         if (!section) return null;
         const { controlSetRows } = section;
