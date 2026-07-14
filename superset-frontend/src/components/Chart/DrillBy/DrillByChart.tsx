@@ -46,7 +46,17 @@ export default function DrillByChart({
   inContextMenu,
 }: DrillByChartProps) {
   const hooks = useMemo(() => ({ onContextMenu }), [onContextMenu]);
-
+  
+//  const containerRef = useRef<HTMLDivElement>(null);
+//  useEffect(() => {
+    // After SuperChart mounts with correct container size, trigger ECharts resize
+//    const timer = setTimeout(() => {
+//      window.dispatchEvent(new Event('resize'));
+//    }, 350); // wait for modal animation + data render
+   
+//    return () => clearTimeout(timer);
+//  }, []);
+  
   return (
     <div
       css={css`

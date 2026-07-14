@@ -457,7 +457,7 @@ export default function transformProps(
           type: 'text',
           ...getTotalValuePadding({ chartPadding, donut, width, height }),
           style: {
-            text: t('Total: %s', numberFormatter(totalValue)),
+            text: t('%s', numberFormatter(totalValue)),
             fontSize: 16,
             fontWeight: 'bold',
             fill: theme.colorText,

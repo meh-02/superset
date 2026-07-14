@@ -111,6 +111,7 @@ const ModalFooter = ({ formData, closeModal }: ModalFooterProps) => {
     datasource_type,
     formData,
   ]);
+  
   const isEditDisabled = !url || !canExplore;
 
   return (
@@ -461,6 +462,13 @@ export default function DrillByModal({
     }
   }, [addDangerToast, drilledFormData]);
   const { metadataBar } = useDatasetMetadataBar({ dataset });
+  
+//  useEffect(() => {
+//    if (!isChartDataLoading && chartDataResult) {
+      // Data just finished loading -- trigger resize so ECharts centers the label
+//      setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+//    }
+//  }, [isChartDataLoading, chartDataResult]);
 
   return (
     <Modal
@@ -538,6 +546,7 @@ export default function DrillByModal({
             result={chartDataResult}
             onContextMenu={onContextMenu}
             inContextMenu={inContextMenu}
+            key={`drill-by-chart-${chartDataResult.length}-${drilledFormData.slice_id}`}
           />
         )}
         {drillByDisplayMode === DrillByType.Table &&
