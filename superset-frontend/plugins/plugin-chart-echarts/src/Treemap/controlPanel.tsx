@@ -93,6 +93,33 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'label_font_size',
+            config: {
+              type: 'SliderControl',
+              label: t('Label Font Size'),
+              renderTrigger: true,
+              min: 10,
+              max: 40,
+              step: 1,
+              default: DEFAULT_FORM_DATA.labelFontSize,
+              description: t('Font size of the treemap labels in pixels.'),
+            },
+          },
+        ],
+        [
+          {
+            name: 'label_font_color',
+            config: {
+             type: 'ColorPickerControl',
+             label: t('Label Font Color'),
+             renderTrigger: true,
+             default: {r: 0, g: 0, b: 0, a: 1},
+             description: t('Color of the treemap label text.'),
+            },
+          },
+        ],
+        [
+          {
             name: 'number_format',
             config: {
               type: 'SelectControl',

@@ -142,6 +142,8 @@ export default function transformProps(
     showUpperLabels,
     dashboardId,
     sliceId,
+    labelFontSize = 12,
+    labelFontColor = {r: 0, g: 0, b: 0, a: 1},
   }: EchartsTreemapFormData = {
     ...DEFAULT_TREEMAP_FORM_DATA,
     ...formData,
@@ -172,7 +174,7 @@ export default function transformProps(
   const groupbyLabels = groupby.map(getColumnLabel);
   const treeData = treeBuilder(data, groupbyLabels, metricLabel);
   const labelProps = {
-    color: theme.colorText,
+    color: `rgba(${labelFontColor.r}, ${labelFontColor.g}, ${labelFontColor.b}, ${labelFontColor.a})`,
   };
   const traverse = (treeNodes: TreeNode[], path: string[]) =>
     treeNodes.map(treeNode => {
@@ -264,6 +266,9 @@ export default function transformProps(
       height: '100%',
       nodeClick: undefined,
       roam: !dashboardId,
+      itemStyle: {
+        borderRadius: 8,
+      },
       breadcrumb: {
         show: false,
         emptyItemWidth: 25,
@@ -280,14 +285,14 @@ export default function transformProps(
         show: showLabels,
         position: labelPosition,
         formatter,
-        fontSize: LABEL_FONTSIZE,
+        fontSize: labelFontSize,
       },
       upperLabel: {
         ...labelProps,
         show: showUpperLabels,
         formatter,
         textBorderColor: 'transparent',
-        fontSize: LABEL_FONTSIZE,
+        fontSize: labelFontSize,
       },
       data: transformedData,
     },

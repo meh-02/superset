@@ -43,6 +43,8 @@ export type EchartsTreemapFormData = QueryFormData & {
   numberFormat: string;
   dateFormat: string;
   dashboardId?: number;
+  labelFontSize?: number;
+  labelFontColor?: {r: number, g: number, b: number, a: number};
 };
 
 export enum EchartsTreemapLabelType {
@@ -64,6 +66,8 @@ export const DEFAULT_FORM_DATA: Partial<EchartsTreemapFormData> = {
   showLabels: true,
   showUpperLabels: true,
   dateFormat: 'smart_date',
+  labelFontSize: 12,
+  labelFontColor: {r: 0, g: 0, b: 0, a: 1},
 };
 export interface TreemapSeriesCallbackDataParams extends CallbackDataParams {
   treePathInfo?: TreePathInfo[];

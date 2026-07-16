@@ -271,10 +271,19 @@ export const useDrillDetailMenuItems = ({
           ...props,
         };
 
-  const menuItems: ItemType[] = [drillToDetailMenuItem];
+  //const menuItems: ItemType[] = [drillToDetailMenuItem];
+  const menuItems: ItemType[] = [];
+  
+  // Only show "Drill to detail" (unfiltered) when no slice filters are active
+  // i.e. user clicked the chart background, not a specific slice
+  if(!filters?.length) {
+    menuItems.push(drillToDetailMenuItem);
+  }
+
   if (drillToDetailByMenuItem) {
     menuItems.push(drillToDetailByMenuItem);
   }
 
   return menuItems;
 };
+
