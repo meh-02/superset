@@ -78,6 +78,7 @@ const cachedFormdataByChart: Record<
     dataMask: DataMask;
     extraControls: Record<string, string | boolean | null>;
     nativeFilters: PartialFilters;
+    chartFormData?: JsonObject;
   }
 > = {};
 
@@ -444,6 +445,7 @@ export default function getFormDataWithExtraFilters({
   );
   if (
     cachedFiltersByChart[sliceId] === filters &&
+    cachedFormData?.chartFormData === chart.form_data &&
     areObjectsEqual(cachedFormData?.own_color_scheme, ownColorScheme) &&
     areObjectsEqual(cachedFormData?.color_scheme, colorScheme) &&
     areObjectsEqual(cachedFormData?.color_namespace, colorNamespace, {
@@ -595,6 +597,7 @@ export default function getFormDataWithExtraFilters({
     dataMask,
     extraControls,
     nativeFilters,
+    chartFormData: chart.form_data,
     ...(chartCustomization && { chart_customization: chartCustomization }),
   };
 
