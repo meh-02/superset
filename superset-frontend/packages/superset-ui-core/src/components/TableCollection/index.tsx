@@ -85,7 +85,7 @@ interface TableCollectionProps<T extends object> {
   resizable?: boolean;
 }
 
-const StyledTable = styled(Table)<{
+const StyledTable = styled(Table) <{
   isPaginationSticky?: boolean;
   showRowCount?: boolean;
 }>`
@@ -96,11 +96,17 @@ const StyledTable = styled(Table)<{
       white-space: nowrap;
     }
 
-    .ant-table-thead > tr > th {
-      text-transform: uppercase;
-      font-size: ${theme.fontSizeSM}px;
-      letter-spacing: 0.5px;
-    }
+.ant-table-thead > tr > th {
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  text-transform: uppercase;
+  font-size: ${theme.fontSizeSM}px;
+  letter-spacing: 0.5px;
+}
 
     .actions {
       opacity: 0;
@@ -135,16 +141,18 @@ const StyledTable = styled(Table)<{
       background-color: ${theme.colorPrimaryBg};
     }
 
-    .ant-table-cell {
-      max-width: 320px;
-      font-feature-settings: 'tnum' 1;
-      text-overflow: ellipsis;
-      overflow: hidden;
-      line-height: 1;
-      vertical-align: middle;
-      padding-left: ${theme.sizeUnit * 4}px;
-      white-space: nowrap;
-    }
+.ant-table-cell {
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+  font-feature-settings: 'tnum' 1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  line-height: 1;
+  vertical-align: middle;
+  padding-left: ${theme.sizeUnit * 4}px;
+  white-space: nowrap;
+}
 
     .ant-table-tbody > tr > td {
       height: ${theme.sizeUnit * 12}px;
@@ -172,9 +180,8 @@ const StyledTable = styled(Table)<{
         top: ${theme.sizeUnit * 12}px;
       }
 
-      ${
-        isPaginationSticky &&
-        `
+      ${isPaginationSticky &&
+    `
         position: sticky;
         bottom: 0;
         left: 0;
@@ -182,7 +189,7 @@ const StyledTable = styled(Table)<{
         background-color: ${theme.colorBgElevated};
         padding: ${theme.sizeUnit * 2}px 0;
       `
-      }
+    }
     }
 
     // Hotfix - antd doesn't apply background color to overflowing cells
@@ -374,18 +381,13 @@ function TableCollection<T extends object>({
   return (
     <StyledTable
       loading={loading}
-      // Ant's `sticky` clones the header into a second table whose <colgroup>
-      // desyncs from the body during resize — use the CSS sticky rule in
-      // TableView instead so a single <table> holds both header and body.
-      sticky={false}
+      sticky={sticky ?? false}
       columns={resizableMappedColumns}
       data={mappedRows}
       size={size}
       data-test="listview-table"
       pagination={paginationConfig}
-      // Skip Ant's inner scroll container when sticky is on so the outer
-      // TableView wrapper is the sole scroll ancestor for the `<th>` sticky.
-      scroll={sticky ? undefined : { x: 'max-content' }}
+      scroll={{ x: 'max-content' }}
       tableLayout={resizable ? 'fixed' : 'auto'}
       rowKey="rowId"
       rowSelection={rowSelection}
@@ -399,8 +401,8 @@ function TableCollection<T extends object>({
           cell: resizable
             ? ResizableTitle
             : (props: HTMLAttributes<HTMLTableCellElement>) => (
-                <th {...props} data-test="sort-header" role="columnheader" />
-              ),
+              <th {...props} data-test="sort-header" role="columnheader" />
+            ),
         },
         body: {
           row: (props: HTMLAttributes<HTMLTableRowElement>) => (
