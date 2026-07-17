@@ -223,9 +223,15 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
     // Build a dynamic suffix from filters applied via the 3-dot "Filters"
     // modal (stored on formData.ui_chart_filters). Example output:
     //   "Top 10 Transformer Tripping's in Circle - TS Karnal".
-    const uiChartFilters = !editMode
-      ? (((formData as any)?.ui_chart_filters || []) as any[])
-      : [];
+   // const uiChartFilters = !editMode
+     // ? (((formData as any)?.ui_chart_filters || []) as any[])
+     // : [];
+
+const uiChartFilters = useSelector<RootState, any[]>(state => {
+  if (editMode) return [];
+  const lqfd = state.charts[slice.slice_id]?.latestQueryFormData as any;
+  return (lqfd?.ui_chart_filters || []) as any[];
+});
 
     const formatFilterValue = (val: any): string => {
       if (Array.isArray(val)) return val.join(', ');
