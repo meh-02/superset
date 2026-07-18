@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { utils, writeFile } from 'xlsx';
+import { utils, write } from 'xlsx';
 
 export default function exportPivotExcel(
   tableSelector: string,
@@ -24,5 +24,41 @@ export default function exportPivotExcel(
 ) {
   const table = document.querySelector(tableSelector);
   const workbook = utils.table_to_book(table);
-  writeFile(workbook, `${fileName}.xlsx`);
+  const headerStyle = {
+    font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+    fill: {
+      patternType: 'solid',
+      fgColor: { rgb: 'FF154C79' },
+      bgColor: { rgb: 'FF154C79' },
+    },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  };
+  workbook.SheetNames.forEach((sheetName: string) => {
+    const sheet = workbook.Sheets[sheetName];
+    const ref = sheet['!ref'];
+    if (!ref) return;
+    const range = utils.decode_range(ref);
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const cellRef = utils.encode_cell({ r: range.s.r, c });
+      if (sheet[cellRef]) {
+        sheet[cellRef].s = headerStyle;
+      }
+    }
+  });
+  const wbBuf = write(workbook, {
+    bookType: 'xlsx',
+    type: 'array',
+    cellStyles: true,
+  });
+  const blob = new Blob([wbBuf], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }

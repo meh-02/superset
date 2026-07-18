@@ -46,9 +46,44 @@ def df_to_excel(df: pd.DataFrame, **kwargs: Any) -> Any:
     # make sure formulas are quoted, to prevent malicious injections
     df = quote_formulas(df)
 
+    write_header = kwargs.pop("header", True)
+    startrow = kwargs.pop("startrow", 0)
+    startcol = kwargs.get("startcol", 0)
+    include_index = kwargs.get("index", True)
+    sheet_name = kwargs.get("sheet_name", "Sheet1")
+
+    data_startrow = startrow + 1 if write_header else startrow
+
     # pylint: disable=abstract-class-instantiated
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, **kwargs)
+        df.to_excel(writer, header=False, startrow=data_startrow, **kwargs)
+
+        if write_header:
+            workbook = writer.book
+            header_format = workbook.add_format(
+                {
+                    "bold": True,
+                    "bg_color": "#154c79",
+                    "font_color": "#FFFFFF",
+                }
+            )
+            worksheet = writer.sheets[sheet_name]
+            index_offset = df.index.nlevels if include_index else 0
+            for col_num, value in enumerate(df.columns):
+                worksheet.write(
+                    startrow,
+                    startcol + index_offset + col_num,
+                    value,
+                    header_format,
+                )
+            if include_index:
+                for i, name in enumerate(df.index.names):
+                    worksheet.write(
+                        startrow,
+                        startcol + i,
+                        name if name is not None else "",
+                        header_format,
+                    )
 
     return output.getvalue()
 

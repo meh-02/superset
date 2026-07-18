@@ -47,6 +47,9 @@ import { getDrillPayload } from './utils';
 import { ResultsPage } from './types';
 
 const PAGE_SIZE = 50;
+// Larger chunk size used only by the background prefetch that powers the
+// download button. The visible pagination still uses PAGE_SIZE.
+const EXPORT_PAGE_SIZE = 500;
 
 export default function DrillDetailPane({
   formData,
@@ -187,6 +190,103 @@ export default function DrillDetailPane({
     },
     [],
   );
+
+  // Cached "all rows" for export. Populated in the background as soon as the
+  // first page (and thus total count) is known, so the download button
+  // resolves instantly instead of waiting on API round-trips at click time.
+  const [prefetchedExportRows, setPrefetchedExportRows] = useState<
+    Record<string, any>[] | null
+  >(null);
+  const prefetchInFlightRef = useRef(false);
+
+  // Fetches ALL rows by paginating through the same 50-per-page endpoint the
+  // modal uses (parallelized). A single giant per_page request has proven
+  // slow, so we mirror the page size the backend is already serving quickly.
+  const fetchAllExportRows = useCallback(async () => {
+    const total = resultsPage?.total ?? 0;
+    if (!total) return [];
+    const jsonPayload = getDrillPayload(formData, filters) ?? {};
+    const pageCount = Math.ceil(total / EXPORT_PAGE_SIZE);
+    const responses = await Promise.all(
+      Array.from({ length: pageCount }, (_, i) =>
+        getDatasourceSamples(
+          datasourceType as DatasourceType,
+          Number(datasourceId),
+          false,
+          jsonPayload,
+          EXPORT_PAGE_SIZE,
+          i + 1,
+          dashboardId,
+        ),
+      ),
+    );
+    const first = responses[0] ?? { colnames: [], coltypes: [], data: [] };
+    const allColNames = ensureIsArray(first.colnames) as string[];
+    const allColTypes = ensureIsArray(first.coltypes) as GenericDataType[];
+    const rawRows = responses.flatMap(
+      (r: JsonObject) => (r.data ?? []) as Record<string, any>[],
+    );
+    const asObjects = rawRows.map((row: Record<string, any>) =>
+      allColNames.reduce(
+        (acc, col) => ({ ...acc, [col]: row[col] }),
+        {} as Record<string, any>,
+      ),
+    );
+    const temporalCols = allColNames.filter(
+      (_, idx) => allColTypes[idx] === GenericDataType.Temporal,
+    );
+    const formatted = applyFormattingToTabularData(asObjects, temporalCols);
+    const displayNames = allColNames.map(k =>
+      (dataset?.verbose_map?.[k] ?? k).replace(/_/g, ' ').toUpperCase(),
+    );
+    return formatted.map(row =>
+      Object.fromEntries(
+        allColNames.map((k, i) => [displayNames[i], row[k]]),
+      ),
+    );
+  }, [
+    resultsPage?.total,
+    formData,
+    filters,
+    datasourceType,
+    datasourceId,
+    dashboardId,
+    dataset?.verbose_map,
+  ]);
+
+  // Reset the prefetch cache whenever filters or the underlying dataset
+  // change — otherwise stale rows would slip into a subsequent download.
+  useEffect(() => {
+    setPrefetchedExportRows(null);
+    prefetchInFlightRef.current = false;
+  }, [filters, dataSetVersion]);
+
+  // Prefetch all rows in the background as soon as the modal knows the total.
+  useEffect(() => {
+    if (
+      !resultsPage?.total ||
+      prefetchedExportRows !== null ||
+      prefetchInFlightRef.current
+    ) {
+      return;
+    }
+    prefetchInFlightRef.current = true;
+    fetchAllExportRows()
+      .then(rows => setPrefetchedExportRows(rows))
+      .catch(() => setPrefetchedExportRows([]))
+      .finally(() => {
+        prefetchInFlightRef.current = false;
+      });
+  }, [resultsPage?.total, prefetchedExportRows, fetchAllExportRows]);
+
+  // Prefer cached rows when the download button is clicked; fall back to a
+  // just-in-time fetch if the prefetch hasn't landed yet.
+  const resolveExportRows = useCallback(async () => {
+    if (prefetchedExportRows) return prefetchedExportRows;
+    const rows = await fetchAllExportRows();
+    setPrefetchedExportRows(rows);
+    return rows;
+  }, [prefetchedExportRows, fetchAllExportRows]);
 
   // Clear cache on reload button click
   const handleReload = useCallback(() => {
@@ -342,6 +442,7 @@ export default function DrillDetailPane({
           onReload={handleReload}
           exportData={exportDataWithDisplayNames}
           exportColumnNames={exportDisplayColumnNames}
+          fetchExportData={resolveExportRows}
           chartName={chartName}
           searchText={searchText}
           onSearchChange={setSearchText}

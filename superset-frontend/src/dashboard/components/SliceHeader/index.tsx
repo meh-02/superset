@@ -35,7 +35,12 @@ import {
 import { useUiConfig } from 'src/components/UiConfigContext';
 import { isEmbedded } from 'src/dashboard/util/isEmbedded';
 import { Tooltip, EditableTitle, Icons } from '@superset-ui/core/components';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  updateQueryFormData,
+  updateChartFormData,
+  postChartFormData,
+} from 'src/components/Chart/chartAction';
 import SliceHeaderControls from 'src/dashboard/components/SliceHeaderControls';
 import { SliceHeaderControlsProps } from 'src/dashboard/components/SliceHeaderControls/types';
 import FiltersBadge from 'src/dashboard/components/FiltersBadge';
@@ -178,11 +183,21 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
       'dashboard.slice.header',
     );
     const uiConfig = useUiConfig();
+    const dispatch = useDispatch();
     const shouldShowRowLimitWarning =
       !isEmbedded() || uiConfig.showRowLimitWarning;
     const dashboardPageId = useContext(DashboardPageIdContext);
     const [headerTooltip, setHeaderTooltip] = useState<ReactNode | null>(null);
     const headerRef = useRef<HTMLDivElement>(null);
+    // Snapshot the chart's pristine adhoc_filters and time_range on first
+    // mount. Clear-chart-filter reverts to these so the explore-configured
+    // filters are preserved.
+    const originalAdhocFiltersRef = useRef(
+      ((formData as any)?.adhoc_filters || []) as any[],
+    );
+    const originalTimeRangeRef = useRef(
+      (formData as any)?.time_range ?? 'No filter',
+    );
     // TODO: change to indicator field after it will be implemented
     const crossFilterValue = useSelector<RootState, any>(
       state => state.dataMask[slice?.slice_id]?.filterState?.value,
@@ -211,10 +226,10 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
       countFromSecondQuery != null
         ? countFromSecondQuery
         : Number(
-            firstQueryResponse?.sql_rowcount ??
-              firstQueryResponse?.rowcount ??
-              0,
-          );
+          firstQueryResponse?.sql_rowcount ??
+          firstQueryResponse?.rowcount ??
+          0,
+        );
 
     const canExplore = !editMode && supersetCanExplore;
     const showRowLimitWarning =
@@ -223,9 +238,15 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
     // Build a dynamic suffix from filters applied via the 3-dot "Filters"
     // modal (stored on formData.ui_chart_filters). Example output:
     //   "Top 10 Transformer Tripping's in Circle - TS Karnal".
-    const uiChartFilters = !editMode
-      ? (((formData as any)?.ui_chart_filters || []) as any[])
-      : [];
+    // const uiChartFilters = !editMode
+    //   ? (((formData as any)?.ui_chart_filters || []) as any[])
+    //   : [];
+
+    const uiChartFilters = useSelector<RootState, any[]>(state => {
+      if (editMode) return [];
+      const lqfd = state.charts[slice.slice_id]?.latestQueryFormData as any;
+      return (lqfd?.ui_chart_filters || []) as any[];
+    });
 
     const formatFilterValue = (val: any): string => {
       if (Array.isArray(val)) return val.join(', ');
@@ -244,18 +265,18 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
 
     const filterSuffix = uiChartFilters.length
       ? ` in ${uiChartFilters
-          .map((f: any) => {
-            const rawLabel = f?.subjectLabel || f?.subject || '';
-            const label = prettifyLabel(rawLabel);
-            const op = f?.operator;
-            const valueStr = formatFilterValue(f?.comparator);
-            if (op === '==' || op === 'TEMPORAL_RANGE' || op === 'IN') {
-              return `${label} - ${valueStr}`;
-            }
-            return `${label} ${op} ${valueStr}`;
-          })
-          .filter(Boolean)
-          .join(', ')}`
+        .map((f: any) => {
+          const rawLabel = f?.subjectLabel || f?.subject || '';
+          const label = prettifyLabel(rawLabel);
+          const op = f?.operator;
+          const valueStr = formatFilterValue(f?.comparator);
+          if (op === '==' || op === 'TEMPORAL_RANGE' || op === 'IN') {
+            return `${label} - ${valueStr}`;
+          }
+          return `${label} ${op} ${valueStr}`;
+        })
+        .filter(Boolean)
+        .join(', ')}`
       : '';
 
     const displayTitle = `${sliceName || ''}${filterSuffix}`;
@@ -276,6 +297,26 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
         setHeaderTooltip(null);
       }
     }, [displayTitle, filterSuffix, width, height, canExplore]);
+
+    const handleClearChartFilter = () => {
+      const updatedFormData = {
+        ...(formData as any),
+        adhoc_filters: originalAdhocFiltersRef.current,
+        time_range: originalTimeRangeRef.current,
+        ui_chart_filters: [],
+      };
+      dispatch(updateChartFormData(updatedFormData, slice.slice_id));
+      dispatch(updateQueryFormData(updatedFormData, slice.slice_id));
+      dispatch(
+        postChartFormData(
+          updatedFormData,
+          true,
+          undefined,
+          slice.slice_id,
+          dashboardId,
+        ),
+      );
+    };
 
     const exploreUrl = `/explore/?dashboard_page_id=${dashboardPageId}&slice_id=${slice.slice_id}`;
 
@@ -382,6 +423,24 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
                     />
                   }
                 />
+              )}
+              {!uiConfig.hideChartControls && uiChartFilters.length > 0 && (
+                <Tooltip
+                  placement="top"
+                  title={t('Clear chart filter')}
+                >
+                  <Icons.ClearOutlined
+                    role="button"
+                    aria-label={t('Clear chart filter')}
+                    iconSize="l"
+                    iconColor={theme.colorPrimary}
+                    onClick={handleClearChartFilter}
+                    css={css`
+                      cursor: pointer;
+                      padding: ${theme.sizeUnit}px;
+                    `}
+                  />
+                </Tooltip>
               )}
               {!uiConfig.hideChartControls && (
                 <SliceHeaderControls

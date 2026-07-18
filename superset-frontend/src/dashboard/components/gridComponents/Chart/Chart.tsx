@@ -25,7 +25,7 @@ import { debounce } from 'lodash';
 import { bindActionCreators } from 'redux';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { utils, writeFile } from 'xlsx';
+import { utils, write, writeFile } from 'xlsx';
 import { GenericDataType } from '@apache-superset/core/common';
 import { applyFormattingToTabularData } from 'src/utils/common';
 import { exportChart } from 'src/explore/exploreUtils';
@@ -611,19 +611,50 @@ console.log('latestQueryFormData', chart?.latestQueryFormData);
         Object.fromEntries(colnames.map((k, i) => [displayNames[i], row[k]])),
       );
 
-      const sheet = utils.json_to_sheet(exportRows, { header: displayNames });
-      const book = utils.book_new();
-      utils.book_append_sheet(book, sheet, 'Data');
-
       const safeName = (sliceSliceName || 'chart-data')
         .replace(/[\\/:*?"<>|]/g, '_')
         .trim() || 'chart-data';
 
-      writeFile(
-        book,
-        `${safeName}.${format}`,
-        format === 'csv' ? { bookType: 'csv' } : undefined,
-      );
+      const sheet = utils.json_to_sheet(exportRows, { header: displayNames });
+      const book = utils.book_new();
+      utils.book_append_sheet(book, sheet, 'Data');
+      if (format === 'xlsx') {
+        const headerStyle = {
+          font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+          fill: {
+            patternType: 'solid',
+            fgColor: { rgb: 'FF154C79' },
+            bgColor: { rgb: 'FF154C79' },
+          },
+          alignment: { horizontal: 'center', vertical: 'center' },
+        };
+        displayNames.forEach((_, colIdx) => {
+          const cellRef = utils.encode_cell({ r: 0, c: colIdx });
+          if (!sheet[cellRef]) {
+            sheet[cellRef] = { t: 's', v: displayNames[colIdx] };
+          }
+          sheet[cellRef].s = headerStyle;
+        });
+        const wbBuf = write(book, {
+          bookType: 'xlsx',
+          type: 'array',
+          cellStyles: true,
+        });
+        const blob = new Blob([wbBuf], {
+          type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${safeName}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      } else {
+        writeFile(book, `${safeName}.${format}`, { bookType: 'csv' });
+      }
     },
     [queriesResponse, datasource, sliceSliceName],
   );
