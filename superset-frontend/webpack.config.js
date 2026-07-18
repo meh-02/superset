@@ -453,6 +453,12 @@ const config = {
     alias: {
       '@storybook-shared': path.resolve(APP_DIR, '.storybook/shared'),
       react: path.resolve(path.join(APP_DIR, './node_modules/react')),
+      // Force all `xlsx` imports to resolve to xlsx-js-style so that
+      // cell styling (font/fill) is preserved on write. The community
+      // xlsx package strips the `s` property from cells at write time.
+      xlsx$: path.resolve(
+        path.join(APP_DIR, './node_modules/xlsx-js-style/dist/xlsx.min.js'),
+      ),
       // TODO: remove Handlebars alias once Handlebars NPM package has been updated to
       // correctly support webpack import (https://github.com/handlebars-lang/handlebars.js/issues/953)
       handlebars: 'handlebars/dist/handlebars.js',

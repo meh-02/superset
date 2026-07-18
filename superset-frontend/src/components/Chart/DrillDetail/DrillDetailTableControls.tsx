@@ -38,6 +38,7 @@ export type TableControlsProps = {
   onReload: () => void;
   exportData?: Record<string, any>[];
   exportColumnNames?: string[];
+  fetchExportData?: () => Promise<Record<string, any>[]>;
   chartName?: string;
   searchText?: string;
   onSearchChange?: (value: string) => void;
@@ -51,6 +52,7 @@ export default function TableControls({
   onReload,
   exportData,
   exportColumnNames,
+  fetchExportData,
   chartName,
   searchText = '',
   onSearchChange,
@@ -160,6 +162,7 @@ export default function TableControls({
             columnNames={exportColumnNames}
             fileName={chartName || 'drill-to-detail'}
             imageTargetSelector=".drill-detail-modal-target"
+            fetchExportData={fetchExportData}
           />
         )}
       </div>

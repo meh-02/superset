@@ -17,6 +17,7 @@
  * under the License.
  */
 import { Key, SyntheticEvent, useCallback } from 'react';
+import { message } from 'antd';
 import { utils, writeFile } from 'xlsx';
 import { t } from '@apache-superset/core/translation';
 import { css, useTheme } from '@apache-superset/core/theme';
@@ -38,10 +39,23 @@ export interface ModalDownloadDropdownProps {
   // CSS selector resolved via .closest() from the click target;
   // must uniquely identify the modal body wrapper to screenshot.
   imageTargetSelector: string;
+  // When provided, called on CSV/Excel export to fetch the full dataset
+  // (bypasses in-memory pagination). Falls back to `data` if omitted.
+  fetchExportData?: () => Promise<Record<string, any>[]>;
 }
 
 const sanitizeFileName = (name: string) =>
   (name || 'chart-data').replace(/[\\/:*?"<>|]/g, '_').trim() || 'chart-data';
+
+const HEADER_STYLE = {
+  font: { bold: true, color: { rgb: 'FFFFFFFF' } },
+  fill: {
+    patternType: 'solid',
+    fgColor: { rgb: 'FF154C79' },
+    bgColor: { rgb: 'FF154C79' },
+  },
+  alignment: { horizontal: 'center', vertical: 'center' },
+};
 
 const buildWorksheet = (
   data: Record<string, any>[],
@@ -55,37 +69,74 @@ const buildWorksheet = (
   return utils.json_to_sheet(data ?? [], { header: safeCols });
 };
 
+const applyHeaderStyle = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sheet: any,
+  columnNames: string[],
+) => {
+  columnNames.forEach((name, colIdx) => {
+    const cellRef = utils.encode_cell({ r: 0, c: colIdx });
+    if (!sheet[cellRef]) {
+      sheet[cellRef] = { t: 's', v: name };
+    }
+    sheet[cellRef].s = HEADER_STYLE;
+  });
+};
+
 export const ModalDownloadDropdown = ({
   data,
   columnNames,
   fileName,
   imageTargetSelector,
+  fetchExportData,
 }: ModalDownloadDropdownProps) => {
   const theme = useTheme();
   const { addDangerToast } = useToasts();
   const safeName = sanitizeFileName(fileName);
 
-  const onExportCsv = useCallback(() => {
+  const resolveData = useCallback(async () => {
+    if (fetchExportData) {
+      const rows = await fetchExportData();
+      return rows ?? [];
+    }
+    return data;
+  }, [fetchExportData, data]);
+
+  const onExportCsv = useCallback(async () => {
+    const dismiss = message.loading(t('Preparing download…'), 0);
     try {
-      const sheet = buildWorksheet(data, columnNames);
+      const rows = await resolveData();
+      const sheet = buildWorksheet(rows, columnNames);
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, 'Data');
       writeFile(book, `${safeName}.csv`, { bookType: 'csv' });
     } catch (e) {
       addDangerToast(t('Sorry, something went wrong. Try again later.'));
+    } finally {
+      dismiss();
     }
-  }, [data, columnNames, safeName, addDangerToast]);
+  }, [resolveData, columnNames, safeName, addDangerToast]);
 
-  const onExportExcel = useCallback(() => {
+  const onExportExcel = useCallback(async () => {
+    const dismiss = message.loading(t('Preparing download…'), 0);
     try {
-      const sheet = buildWorksheet(data, columnNames);
+      const rows = await resolveData();
+      const sheet = buildWorksheet(rows, columnNames);
+      const headerNames = columnNames?.length
+        ? columnNames
+        : rows?.[0]
+          ? Object.keys(rows[0])
+          : [];
+      applyHeaderStyle(sheet, headerNames);
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, 'Data');
       writeFile(book, `${safeName}.xlsx`);
     } catch (e) {
       addDangerToast(t('Sorry, something went wrong. Try again later.'));
+    } finally {
+      dismiss();
     }
-  }, [data, columnNames, safeName, addDangerToast]);
+  }, [resolveData, columnNames, safeName, addDangerToast]);
 
   const onDownloadImage = useCallback(
     (domEvent: SyntheticEvent) => {
