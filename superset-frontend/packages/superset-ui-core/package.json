@@ -50,7 +50,7 @@
     "pretty-ms": "^9.3.0",
     "re-resizable": "^6.11.2",
     "react-ace": "^14.0.1",
-    "react-js-cron": "^5.2.0",
+    "react-js-cron": "^6.0.2",
     "react-draggable": "^4.5.0",
     "react-resize-detector": "^7.1.2",
     "react-syntax-highlighter": "^16.1.1",
