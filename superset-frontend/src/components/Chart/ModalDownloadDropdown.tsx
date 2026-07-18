@@ -42,6 +42,9 @@ export interface ModalDownloadDropdownProps {
   // When provided, called on CSV/Excel export to fetch the full dataset
   // (bypasses in-memory pagination). Falls back to `data` if omitted.
   fetchExportData?: () => Promise<Record<string, any>[]>;
+  // When provided, replaces the client-side file write with a
+  // backend-generated stream — used for large drill-detail exports.
+  directDownload?: (format: 'csv' | 'xlsx') => Promise<void>;
 }
 
 const sanitizeFileName = (name: string) =>
@@ -89,6 +92,7 @@ export const ModalDownloadDropdown = ({
   fileName,
   imageTargetSelector,
   fetchExportData,
+  directDownload,
 }: ModalDownloadDropdownProps) => {
   const theme = useTheme();
   const { addDangerToast } = useToasts();
@@ -105,38 +109,46 @@ export const ModalDownloadDropdown = ({
   const onExportCsv = useCallback(async () => {
     const dismiss = message.loading(t('Preparing download…'), 0);
     try {
-      const rows = await resolveData();
-      const sheet = buildWorksheet(rows, columnNames);
-      const book = utils.book_new();
-      utils.book_append_sheet(book, sheet, 'Data');
-      writeFile(book, `${safeName}.csv`, { bookType: 'csv' });
+      if (directDownload) {
+        await directDownload('csv');
+      } else {
+        const rows = await resolveData();
+        const sheet = buildWorksheet(rows, columnNames);
+        const book = utils.book_new();
+        utils.book_append_sheet(book, sheet, 'Data');
+        writeFile(book, `${safeName}.csv`, { bookType: 'csv' });
+      }
     } catch (e) {
       addDangerToast(t('Sorry, something went wrong. Try again later.'));
     } finally {
       dismiss();
     }
-  }, [resolveData, columnNames, safeName, addDangerToast]);
+  }, [directDownload, resolveData, columnNames, safeName, addDangerToast]);
 
   const onExportExcel = useCallback(async () => {
     const dismiss = message.loading(t('Preparing download…'), 0);
     try {
-      const rows = await resolveData();
-      const sheet = buildWorksheet(rows, columnNames);
-      const headerNames = columnNames?.length
-        ? columnNames
-        : rows?.[0]
-          ? Object.keys(rows[0])
-          : [];
-      applyHeaderStyle(sheet, headerNames);
-      const book = utils.book_new();
-      utils.book_append_sheet(book, sheet, 'Data');
-      writeFile(book, `${safeName}.xlsx`);
+      if (directDownload) {
+        await directDownload('xlsx');
+      } else {
+        const rows = await resolveData();
+        const sheet = buildWorksheet(rows, columnNames);
+        const headerNames = columnNames?.length
+          ? columnNames
+          : rows?.[0]
+            ? Object.keys(rows[0])
+            : [];
+        applyHeaderStyle(sheet, headerNames);
+        const book = utils.book_new();
+        utils.book_append_sheet(book, sheet, 'Data');
+        writeFile(book, `${safeName}.xlsx`);
+      }
     } catch (e) {
       addDangerToast(t('Sorry, something went wrong. Try again later.'));
     } finally {
       dismiss();
     }
-  }, [resolveData, columnNames, safeName, addDangerToast]);
+  }, [directDownload, resolveData, columnNames, safeName, addDangerToast]);
 
   const onDownloadImage = useCallback(
     (domEvent: SyntheticEvent) => {

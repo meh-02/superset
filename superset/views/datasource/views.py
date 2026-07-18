@@ -17,7 +17,7 @@
 from collections import Counter
 from typing import Any
 
-from flask import redirect, request
+from flask import current_app, redirect, request
 from flask_appbuilder import expose, permission_name
 from flask_appbuilder.api import rison
 from flask_appbuilder.security.decorators import has_access, has_access_api
@@ -46,12 +46,16 @@ from superset.views.base import (
     api,
     BaseSupersetView,
     deprecated,
+    generate_download_headers,
     json_error_response,
+    XlsxResponse,
+    CsvResponse,
 )
 from superset.views.datasource.schemas import (
     ExternalMetadataParams,
     ExternalMetadataSchema,
     get_external_metadata_schema,
+    SamplesDownloadRequestSchema,
     SamplesPayloadSchema,
     SamplesRequestSchema,
 )
@@ -228,6 +232,78 @@ class Datasource(BaseSupersetView):
             payload=payload,
         )
         return self.json_response({"result": rv})
+
+    @expose("/samples/download", methods=("POST",))
+    @has_access_api
+    @permission_name("samples")
+    @api
+    @handle_api_exception
+    def samples_download(self) -> FlaskResponse:
+        """Stream the drill-detail dataset as a single xlsx/csv file so the
+        browser doesn't have to stitch together hundreds of paginated JSON
+        responses. Uses the same auth checks as /samples."""
+        import pandas as pd
+
+        from superset.utils.core import GenericDataType
+        from superset.utils.excel import apply_column_types, df_to_excel
+        from superset.utils.csv import df_to_escaped_csv
+
+        try:
+            params = SamplesDownloadRequestSchema().load(request.args)
+            payload = SamplesPayloadSchema().load(request.json)
+        except ValidationError as err:
+            return json_error_response(err.messages, status=400)
+
+        if security_manager.is_guest_user():
+            if not params["dashboard_id"]:
+                return json_error_response(_("Forbidden"), status=403)
+            dataset = DatasetDAO.find_by_id(
+                params["datasource_id"], skip_base_filter=True
+            )
+            dashboard = DashboardDAO.find_by_id(
+                params["dashboard_id"], skip_base_filter=True
+            )
+            if not (dashboard and dataset):
+                return self.response_404()
+            if not security_manager.can_drill_dataset_via_dashboard_access(
+                dataset,
+                dashboard,
+            ):
+                return json_error_response(_("Forbidden"), status=403)
+
+        samples_row_limit = current_app.config.get("SAMPLES_ROW_LIMIT", 1000)
+        rv = get_samples(
+            datasource_type=params["datasource_type"],
+            datasource_id=params["datasource_id"],
+            force=params["force"],
+            page=1,
+            per_page=samples_row_limit,
+            payload=payload,
+        )
+
+        columns = rv.get("colnames") or []
+        coltypes_raw = rv.get("coltypes") or []
+        data = rv.get("data") or []
+        df = pd.DataFrame(data, columns=columns) if columns else pd.DataFrame(data)
+
+        if coltypes_raw:
+            coltypes = [GenericDataType(c) for c in coltypes_raw]
+            df = apply_column_types(df, coltypes)
+
+        filename = params.get("filename") or "drill-to-detail"
+        fmt = params["format"]
+        if fmt == "csv":
+            csv_data = df_to_escaped_csv(
+                df, index=False, **current_app.config["CSV_EXPORT"]
+            )
+            return CsvResponse(
+                csv_data, headers=generate_download_headers("csv", filename)
+            )
+
+        xlsx_data = df_to_excel(df, index=False)
+        return XlsxResponse(
+            xlsx_data, headers=generate_download_headers("xlsx", filename)
+        )
 
 
 class DatasetEditor(BaseSupersetView):

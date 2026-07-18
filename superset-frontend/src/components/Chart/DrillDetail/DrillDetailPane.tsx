@@ -37,6 +37,7 @@ import {
   TableView,
 } from '@superset-ui/core/components';
 import { getDatasourceSamples } from 'src/components/Chart/chartAction';
+import { SupersetClient } from '@superset-ui/core';
 import { RootState } from 'src/dashboard/types';
 import { useTableColumns, useFilteredTableData } from 'src/explore/components/DataTableControl';
 import { useDatasetMetadataBar } from 'src/features/datasets/metadataBar/useDatasetMetadataBar';
@@ -288,6 +289,56 @@ export default function DrillDetailPane({
     return rows;
   }, [prefetchedExportRows, fetchAllExportRows]);
 
+  // Streams the drill-detail dataset from the backend as a single file,
+  // bypassing the paginated JSON API entirely — the right path when the row
+  // count is too large for the browser to hold in memory or write with
+  // SheetJS.
+  const directDownload = useCallback(
+    async (format: 'csv' | 'xlsx') => {
+      const jsonPayload = getDrillPayload(formData, filters) ?? {};
+      const filename = (
+        chartName ??
+        (formData?.slice_name as string | undefined) ??
+        'drill-to-detail'
+      )
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .trim() || 'drill-to-detail';
+      const searchParams: Record<string, string | number | boolean> = {
+        datasource_type: datasourceType,
+        datasource_id: Number(datasourceId),
+        force: false,
+        format,
+        filename,
+      };
+      if (dashboardId != null) {
+        searchParams.dashboard_id = dashboardId;
+      }
+      const response = (await SupersetClient.post({
+        endpoint: '/datasource/samples/download',
+        jsonPayload,
+        searchParams,
+        parseMethod: null,
+      })) as unknown as Response;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    },
+    [
+      formData,
+      filters,
+      chartName,
+      datasourceType,
+      datasourceId,
+      dashboardId,
+    ],
+  );
+
   // Clear cache on reload button click
   const handleReload = useCallback(() => {
     setResponseError('');
@@ -443,6 +494,7 @@ export default function DrillDetailPane({
           exportData={exportDataWithDisplayNames}
           exportColumnNames={exportDisplayColumnNames}
           fetchExportData={resolveExportRows}
+          directDownload={directDownload}
           chartName={chartName}
           searchText={searchText}
           onSearchChange={setSearchText}

@@ -118,3 +118,20 @@ class SamplesRequestSchema(Schema):
         if "per_page" not in data:
             data["per_page"] = app.config.get("SAMPLES_ROW_LIMIT", 1000)
         return data
+
+
+class SamplesDownloadRequestSchema(Schema):
+    """Query params for the drill-detail file download endpoint. No per_page
+    on purpose — the backend always fetches up to SAMPLES_ROW_LIMIT."""
+
+    datasource_type = fields.String(
+        validate=validate.OneOf([e.value for e in DatasourceType]), required=True
+    )
+    datasource_id = fields.Integer(required=True)
+    force = fields.Boolean(load_default=False)
+    dashboard_id = fields.Integer(required=False, allow_none=True, load_default=None)
+    format = fields.String(
+        validate=validate.OneOf(["xlsx", "csv"]),
+        load_default="xlsx",
+    )
+    filename = fields.String(load_default=None, allow_none=True)
