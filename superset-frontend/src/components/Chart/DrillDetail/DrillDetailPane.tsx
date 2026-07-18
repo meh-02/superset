@@ -49,7 +49,7 @@ import { ResultsPage } from './types';
 const PAGE_SIZE = 50;
 // Larger chunk size used only by the background prefetch that powers the
 // download button. The visible pagination still uses PAGE_SIZE.
-const EXPORT_PAGE_SIZE = 1000;
+const EXPORT_PAGE_SIZE = 500;
 
 export default function DrillDetailPane({
   formData,
