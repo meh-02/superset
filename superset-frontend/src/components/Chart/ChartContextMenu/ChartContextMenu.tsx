@@ -220,6 +220,10 @@ const ChartContextMenu = (
       column =>
         // If using an extension, also filter by column.groupby since the extension might not do this
         (!loadDrillByOptionsExtension || column.groupby) &&
+        // Respect the per-column "Drill by" toggle from Edit Dataset. Older
+        // datasets that predate this field return undefined, which we treat
+        // as enabled to avoid a silent regression.
+        column.is_drill_by !== false &&
         !ensureIsArray(
           formData[filters?.drillBy?.groupbyFieldName ?? ''],
         ).includes(column.column_name) &&

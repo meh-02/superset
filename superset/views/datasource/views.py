@@ -284,6 +284,33 @@ class Datasource(BaseSupersetView):
         columns = rv.get("colnames") or []
         coltypes_raw = rv.get("coltypes") or []
         data = rv.get("data") or []
+
+        # Drop columns the dataset owner has hidden from Drill to Detail via
+        # the per-column toggle. `is_drill_to_detail=False` means the column
+        # should not appear in the downloaded file, matching the modal UI.
+        try:
+            datasource = DatasourceDAO.get_datasource(
+                datasource_type=params["datasource_type"],
+                database_id_or_uuid=str(params["datasource_id"]),
+            )
+            disabled_cols = {
+                c.column_name
+                for c in getattr(datasource, "columns", [])
+                if getattr(c, "is_drill_to_detail", True) is False
+            }
+        except Exception:  # noqa: BLE001
+            disabled_cols = set()
+        if disabled_cols:
+            kept = [
+                (name, coltype)
+                for name, coltype in zip(
+                    columns, coltypes_raw or [None] * len(columns), strict=False
+                )
+                if name not in disabled_cols
+            ]
+            columns = [name for name, _ in kept]
+            coltypes_raw = [ct for _, ct in kept if ct is not None]
+
         df = pd.DataFrame(data, columns=columns) if columns else pd.DataFrame(data)
 
         if coltypes_raw:

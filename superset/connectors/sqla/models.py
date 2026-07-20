@@ -857,6 +857,8 @@ class TableColumn(AuditMixinNullable, ImportExportMixin, CertificationMixin, Mod
     advanced_data_type = Column(String(255))
     groupby = Column(Boolean, default=True)
     filterable = Column(Boolean, default=True)
+    is_drill_to_detail = Column(Boolean, default=True)
+    is_drill_by = Column(Boolean, default=True)
     description = Column(utils.MediumText())
     table_id = Column(Integer, ForeignKey("tables.id", ondelete="CASCADE"))
     is_dttm = Column(Boolean, default=False)
@@ -880,6 +882,8 @@ class TableColumn(AuditMixinNullable, ImportExportMixin, CertificationMixin, Mod
         "advanced_data_type",
         "groupby",
         "filterable",
+        "is_drill_to_detail",
+        "is_drill_by",
         "expression",
         "description",
         "python_date_format",
@@ -1078,6 +1082,8 @@ class TableColumn(AuditMixinNullable, ImportExportMixin, CertificationMixin, Mod
             "uuid",
             "is_certified",
             "is_dttm",
+            "is_drill_to_detail",
+            "is_drill_by",
             "python_date_format",
             "type",
             "type_generic",

@@ -100,7 +100,7 @@ export default function DrillDetailPane({
   });
 
   // Get page of results
-  const resultsPage = useMemo(() => {
+  const rawResultsPage = useMemo(() => {
     const nextResultsPage = resultsPages.get(pageIndex);
     if (nextResultsPage) {
       lastPageIndex.current = pageIndex;
@@ -108,6 +108,37 @@ export default function DrillDetailPane({
     }
     return resultsPages.get(lastPageIndex.current);
   }, [pageIndex, resultsPages]);
+
+  // Set of column names the dataset owner has hidden from Drill to Detail
+  // via the per-column toggle in Edit Dataset. Missing/undefined values from
+  // older datasets are treated as enabled.
+  const drillToDetailDisabledColumns = useMemo(() => {
+    const disabled = new Set<string>();
+    (dataset?.columns ?? []).forEach(col => {
+      if (col.is_drill_to_detail === false && col.column_name) {
+        disabled.add(col.column_name);
+      }
+    });
+    return disabled;
+  }, [dataset?.columns]);
+
+  // resultsPage view that drops hidden columns. Data rows are untouched
+  // (extra keys are harmless); only colNames/colTypes shrink so both the
+  // table display and the download honor the toggle.
+  const resultsPage = useMemo(() => {
+    if (!rawResultsPage) return rawResultsPage;
+    if (!drillToDetailDisabledColumns.size) return rawResultsPage;
+    const keptIndices = rawResultsPage.colNames
+      .map((name, idx) =>
+        drillToDetailDisabledColumns.has(name) ? -1 : idx,
+      )
+      .filter(idx => idx !== -1);
+    return {
+      ...rawResultsPage,
+      colNames: keptIndices.map(i => rawResultsPage.colNames[i]),
+      colTypes: keptIndices.map(i => rawResultsPage.colTypes[i]),
+    };
+  }, [rawResultsPage, drillToDetailDisabledColumns]);
 
   // Shape current page rows as an array of objects keyed by column name —
   // matches what react-table (via useTableColumns) expects.

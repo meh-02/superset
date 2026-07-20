@@ -145,6 +145,8 @@ interface Column {
   expression?: string;
   filterable?: boolean;
   groupby?: boolean;
+  is_drill_to_detail?: boolean;
+  is_drill_by?: boolean;
   is_dttm?: boolean;
   type?: string;
   type_generic?: number;
@@ -527,6 +529,8 @@ function ColumnCollectionTable({
     column_name: t('<new column>'),
     filterable: true,
     groupby: true,
+    is_drill_to_detail: true,
+    is_drill_by: true,
   }),
   columnLabelTooltips,
   filterTerm,
@@ -543,8 +547,18 @@ function ColumnCollectionTable({
               'is_dttm',
               'filterable',
               'groupby',
+              'is_drill_to_detail',
+              'is_drill_by',
             ]
-          : ['column_name', 'type', 'is_dttm', 'filterable', 'groupby']
+          : [
+              'column_name',
+              'type',
+              'is_dttm',
+              'filterable',
+              'groupby',
+              'is_drill_to_detail',
+              'is_drill_by',
+            ]
       }
       sortColumns={
         isFeatureEnabled(FeatureFlag.EnableAdvancedDataTypes)
@@ -555,8 +569,18 @@ function ColumnCollectionTable({
               'is_dttm',
               'filterable',
               'groupby',
+              'is_drill_to_detail',
+              'is_drill_by',
             ]
-          : ['column_name', 'type', 'is_dttm', 'filterable', 'groupby']
+          : [
+              'column_name',
+              'type',
+              'is_dttm',
+              'filterable',
+              'groupby',
+              'is_drill_to_detail',
+              'is_drill_by',
+            ]
       }
       allowDeletes
       allowAddItem={allowAddItem}
@@ -698,6 +722,8 @@ function ColumnCollectionTable({
               groupby: t('Is dimension'),
               is_dttm: t('Is temporal'),
               filterable: t('Is filterable'),
+              is_drill_to_detail: t('Drill to detail'),
+              is_drill_by: t('Drill by'),
             }
           : {
               column_name: t('Column'),
@@ -705,9 +731,18 @@ function ColumnCollectionTable({
               groupby: t('Is dimension'),
               is_dttm: t('Is temporal'),
               filterable: t('Is filterable'),
+              is_drill_to_detail: t('Drill to detail'),
+              is_drill_by: t('Drill by'),
             }
       }
       onChange={onColumnsChange}
+      columnMinWidths={{
+        is_dttm: 70,
+        filterable: 70,
+        groupby: 70,
+        is_drill_to_detail: 70,
+        is_drill_by: 70,
+      }}
       itemRenderers={
         isFeatureEnabled(FeatureFlag.EnableAdvancedDataTypes)
           ? {
@@ -742,6 +777,8 @@ function ColumnCollectionTable({
               is_dttm: checkboxGenerator,
               filterable: checkboxGenerator,
               groupby: checkboxGenerator,
+              is_drill_to_detail: checkboxGenerator,
+              is_drill_by: checkboxGenerator,
             }
           : {
               column_name: (v, onItemChange, _, record) =>
@@ -770,6 +807,8 @@ function ColumnCollectionTable({
               is_dttm: checkboxGenerator,
               filterable: checkboxGenerator,
               groupby: checkboxGenerator,
+              is_drill_to_detail: checkboxGenerator,
+              is_drill_by: checkboxGenerator,
             }
       }
     />
@@ -2463,6 +2502,8 @@ class DatasourceEditor extends PureComponent<
                       column_name: t('<new column>'),
                       filterable: true,
                       groupby: true,
+                      is_drill_to_detail: true,
+                      is_drill_by: true,
                       expression: t('<enter SQL expression here>'),
                       expanded: true,
                     })}

@@ -54,6 +54,7 @@ export interface CRUDCollectionProps {
   expandFieldset?: ReactNode;
   extraButtons?: ReactNode;
   itemGenerator?: () => any;
+  columnMinWidths?: Record<string, number>;
   itemCellProps?: Record<
     string,
     (

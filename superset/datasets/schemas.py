@@ -82,6 +82,8 @@ class DatasetColumnsPutSchema(Schema):
     extra = fields.String(allow_none=True)
     filterable = fields.Boolean()
     groupby = fields.Boolean()
+    is_drill_to_detail = fields.Boolean(load_default=True)
+    is_drill_by = fields.Boolean(load_default=True)
     is_active = fields.Boolean(allow_none=True)
     is_dttm = fields.Boolean(allow_none=True, dump_default=False)
     python_date_format = fields.String(
@@ -270,6 +272,8 @@ class ImportV1ColumnSchema(Schema):
     advanced_data_type = fields.String(allow_none=True)
     groupby = fields.Boolean()
     filterable = fields.Boolean()
+    is_drill_to_detail = fields.Boolean(dump_default=True, load_default=True)
+    is_drill_by = fields.Boolean(dump_default=True, load_default=True)
     expression = fields.String(allow_none=True)
     description = fields.String(allow_none=True)
     python_date_format = fields.String(allow_none=True)
@@ -422,6 +426,9 @@ class DatasetColumnDrillInfoSchema(Schema):
     column_name = fields.String(required=True)
     verbose_name = fields.String(required=False)
     is_dttm = fields.Boolean(required=False)
+    groupby = fields.Boolean(required=False)
+    is_drill_to_detail = fields.Boolean(required=False, dump_default=True)
+    is_drill_by = fields.Boolean(required=False, dump_default=True)
 
 
 class UserSchema(Schema):

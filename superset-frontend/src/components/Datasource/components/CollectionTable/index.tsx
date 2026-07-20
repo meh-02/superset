@@ -327,7 +327,12 @@ export default class CRUDCollection extends PureComponent<
   }
 
   buildTableColumns() {
-    const { tableColumns, allowDeletes, sortColumns = [] } = this.props;
+    const {
+      tableColumns,
+      allowDeletes,
+      sortColumns = [],
+      columnMinWidths = {},
+    } = this.props;
 
     const antdColumns: ColumnsType = tableColumns.map(col => {
       const label = this.getLabel(col);
@@ -345,7 +350,7 @@ export default class CRUDCollection extends PureComponent<
       return {
         key: col,
         dataIndex: col,
-        minWidth: 100,
+        minWidth: columnMinWidths[col] ?? 100,
         title: (
           <>
             {label}

@@ -49,6 +49,8 @@ export interface Column {
   groupby?: boolean;
   is_dttm?: boolean;
   filterable?: boolean;
+  is_drill_to_detail?: boolean;
+  is_drill_by?: boolean;
   verbose_name?: string | null;
   description?: string | null;
   expression?: string | null;

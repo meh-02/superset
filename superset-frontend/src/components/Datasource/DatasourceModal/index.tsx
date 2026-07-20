@@ -39,6 +39,7 @@ import {
 import withToasts from 'src/components/MessageToasts/withToasts';
 import { ErrorMessageWithStackTrace } from 'src/components';
 import type { DatasetObject } from 'src/features/datasets/types';
+import { clearDatasetCache } from 'src/utils/cachedSupersetGet';
 import type { DatasourceModalProps } from '../types';
 
 const DatasourceEditor = AsyncEsmComponent(
@@ -158,6 +159,8 @@ const DatasourceModal: FunctionComponent<DatasourceModalProps> = ({
           expression: column.expression,
           filterable: column.filterable,
           groupby: column.groupby,
+          is_drill_to_detail: column.is_drill_to_detail,
+          is_drill_by: column.is_drill_by,
           is_active: column.is_active,
           is_dttm: column.is_dttm,
           python_date_format: column.python_date_format || null,
@@ -190,6 +193,11 @@ const DatasourceModal: FunctionComponent<DatasourceModalProps> = ({
         endpoint: `/api/v1/dataset/${currentDatasource.id}?override_columns=${syncColumns}`,
         jsonPayload: buildPayload(currentDatasource),
       });
+
+      // Bust the frontend GET cache for this dataset so subsequent
+      // /drill_info/, /related/*/, and other dataset-scoped fetches see the
+      // freshly saved column flags instead of serving stale data.
+      clearDatasetCache(currentDatasource.id);
 
       const { json } = await SupersetClient.get({
         endpoint: `/api/v1/dataset/${currentDatasource?.id}`,

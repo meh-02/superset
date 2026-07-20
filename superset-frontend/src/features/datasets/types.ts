@@ -28,6 +28,8 @@ export type ColumnObject = {
   expression?: string;
   filterable: boolean;
   groupby: boolean;
+  is_drill_to_detail?: boolean;
+  is_drill_by?: boolean;
   is_active: boolean;
   is_dttm: boolean;
   python_date_format?: string;

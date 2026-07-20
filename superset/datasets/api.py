@@ -1324,6 +1324,8 @@ class DatasetRestApi(BaseSupersetModelRestApi):
             "columns.column_name",
             "columns.verbose_name",
             "columns.groupby",
+            "columns.is_drill_to_detail",
+            "columns.is_drill_by",
         ]
         dataset_schema = DatasetDrillInfoSchema()
 
