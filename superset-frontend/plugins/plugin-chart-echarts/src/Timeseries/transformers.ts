@@ -138,7 +138,9 @@ export const getBaselineSeriesForStream = (
           | EchartsTimeseriesSeriesType.Middle
           | EchartsTimeseriesSeriesType.End)
       : undefined,
-    smooth: seriesType === EchartsTimeseriesSeriesType.Smooth,
+    smooth:
+      seriesType === EchartsTimeseriesSeriesType.Smooth ||
+      seriesType === EchartsTimeseriesSeriesType.SmoothDotted,
   };
 };
 
@@ -356,6 +358,12 @@ export function transformSeries(
     isConfidenceBand || (stack === StackControlsValue.Stream && area)
       ? { ...opts.lineStyle, opacity: OpacityEnum.Transparent }
       : { ...opts.lineStyle, opacity };
+  if (
+    seriesType === EchartsTimeseriesSeriesType.Dotted ||
+    seriesType === EchartsTimeseriesSeriesType.SmoothDotted
+  ) {
+    lineStyle.type = 'dotted';
+  }
 
   // Use filled circles in dark mode to avoid the white fill issue with hollow circles
   // Use emptyCircle explicitly in light mode
@@ -386,7 +394,9 @@ export function transformSeries(
     ...(colorByPrimaryAxis ? {} : { itemStyle }),
     // @ts-ignore
     type: plotType,
-    smooth: seriesType === 'smooth',
+    smooth:
+      seriesType === EchartsTimeseriesSeriesType.Smooth ||
+      seriesType === EchartsTimeseriesSeriesType.SmoothDotted,
     triggerLineEvent: true,
     // @ts-expect-error
     step: ['start', 'middle', 'end'].includes(seriesType as string)

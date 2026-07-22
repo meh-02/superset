@@ -49,6 +49,8 @@ export enum EchartsTimeseriesSeriesType {
   Start = 'start',
   Middle = 'middle',
   End = 'end',
+  Dotted = 'dotted',
+  SmoothDotted = 'smooth_dotted',
 }
 
 export type EchartsTimeseriesFormData = QueryFormData & {
